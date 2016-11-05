@@ -176,12 +176,12 @@ def getStart(tFile):
 			#If not we start over from the next line
 			except ValueError:
 				if first:
-					first, second=False, False
+					first, second = False, False
 				break
 			if first:
-				second=True
+				second = True
 			else:
-				first=True
+				first = True
 		continue
 	#If we've made it out of the loop then we've found the starting position (probably)
 	del(tFile, first, second, i)
