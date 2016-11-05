@@ -3,9 +3,13 @@
     Then calculates emissivites based on the optical constants derived- also for SCIENCE
     
     Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
+    
+    TODO:
+    	-Impliment MIE theory
+	-
 '''
 
-import matplotlib.pyplot as plt
+#import matplotlib.pyplot as plt
 from numpy import interp, real as rl, imag as im
 from kmod import whiteSpaceParser as wsp, getStart as GS, getCol as GC, listifier as li, columnizer as clm
 from cmath import sqrt as sqrt
@@ -314,7 +318,7 @@ imaginator(AstroSil['K'], True)
 
 imaginator(Water['K'], True)
 
-
+'''
 def flot(DICT, y):
     if y == 'K':
         plt.ylabel('Exitinction Coefficient')
@@ -334,3 +338,4 @@ flot(IMPOptConst, 'N')
 flot(AstroSil, 'N')
 flot(AmorphCarb, 'N')
 flot(DirtyIce, 'N')
+'''
