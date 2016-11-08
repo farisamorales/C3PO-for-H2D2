@@ -5,6 +5,10 @@
     Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
     
     TODO:
+    	-Deimpliment the 'as's from the importations
+	-Remove superflous & misleading interper function
+	-Remove the unecessary dictUpdate function
+	-Rename Kate's waves to something more general
     	-Impliment MIE theory
 	-
 '''
@@ -24,14 +28,12 @@ def trimmer(LIST, mini, maxi):
     for ele in LIST:
         if ele >= mini and ele <= maxi:
             tempList.append(ele)
-    del(LIST, mini, maxi)
     return tempList
 #End trimming function
 #---------------------------------------------------
 #Short function to update dictionaries with new data because I'm /this/ lazy
 def dictUpdate(dictName, LIST, KEYNAME):
     dictName.update({KEYNAME:LIST})
-    del(dictName, LIST, KEYNAME)
 #End dictionary updater
 #-------------------------------------------------------------------------------
 #Short function to ease doing /this/ again and again and again and again and...
@@ -39,7 +41,6 @@ def dictUpdate(dictName, LIST, KEYNAME):
 #returns a numpy array object; should be converted to standard python list obj
 def interper(x, y):
     tempList = list(interp(Kates['WAV'], x, y))
-    del(x, y)
     return tempList
 #End short function for ease of not doing whatever /this/ was
 #-------------------------------------------------------------
@@ -58,7 +59,6 @@ def writer(DICT, FILENAME):
         tempFile.write('\n')
         row += 1
     tempFile.close()
-    del(DICT, FILENAME, tempFile, row)
 #End short writing function
 #------------------------------------------------------------
 #Short function to change values in a list to complex numbers
@@ -69,7 +69,6 @@ def imaginator(LIST, demaginate=False):
     else:
         for i, ele in enumerate(LIST):
             LIST[i] = 1j * ele
-    del(i, ele)
     return LIST
 #No, it wasn't necessary to write a function for this too but I'm doing it anyway
 #------------------------------------------------------------------------------------------
@@ -81,34 +80,34 @@ def EMT(NM, KM, NI, KI, V=.5):
     M, I = NM + KM, NI + KI
     F = (I ** 2 - M ** 2) / (I + 2.0 * M)
     AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
-    del(NM, KM, NI, KI, V, M, I, F)
     return float(rl(AMOC)), float(im(AMOC))
-#End short EMT function... wait what this is it?
+#End short EMT function
 #---------------------------------------------
 #- File directories for the necessary tables -
 #---------------------------------------------
 
+#File directory for wirtten tables
+directory = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
+
 #Amorphous Carbon Optical Constants
-dir_AC = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\AmorphCarbOptConst.dat'
+dir_AC = directory + r'\AmorphCarbOptConst.dat'
 
 #AstroSil Optical Constants
-dir_AS = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\AstroSilOptConst.dat'
+dir_AS = directory+ r'\AstroSilOptConst.dat'
 
 #Dirty Ice Optical Constants
-dir_DI = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\DirtyIceOptConst.dat'
+dir_DI = directory + r'\DirtyIceOptConst.dat'
 
 #Water Optical Constants
-dir_WA = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\waterOpticalConstants.dat'
+dir_WA = directory + r'\waterOpticalConstants.dat'
 
 #Kate's Waves
-dir_KW = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\wav_set.dat'
+dir_KW = directory + r'\wav_set.dat'
 
 #Kate's Grain Sizes; table is currently unreadable by my modules so it needs to manually
 #be modified; sorry!
-dir_KG = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\grain_size_grid_suvsil.list'
+dir_KG = directory + r'\grain_size_grid_suvsil.list'
 
-#File directory for wirtten tables
-directory = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
 
 #-----------------------------------------------
 #- Writing data from tables in files to memory -
