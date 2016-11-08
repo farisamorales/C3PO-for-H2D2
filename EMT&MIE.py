@@ -15,7 +15,7 @@
 
 #import matplotlib.pyplot as plt
 from numpy import interp, real as rl, imag as im
-from kmod import whiteSpaceParser as wsp, getStart as GS, getCol as GC, listifier as li, columnizer as clm
+from kmod import whiteSpaceParser, getStart as GS, getCol as GC, listifier as li, columnizer as clm
 from cmath import sqrt as sqrt
 
 #------------------------------------------------------
