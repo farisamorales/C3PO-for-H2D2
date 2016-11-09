@@ -26,7 +26,6 @@ def trimmer(LIST, mini, maxi):
     for ele in LIST:
         if ele >= mini and ele <= maxi:
             tempList.append(ele)
-    del(LIST, mini, maxi)
     return tempList
 #End trimming function
 #-------------------------------------------------------------
@@ -45,7 +44,6 @@ def writer(DICT, FILENAME):
         tempFile.write('\n')
         row += 1
     tempFile.close()
-    del(DICT, FILENAME, tempFile, row)
 #End short writing function
 #------------------------------------------------------------
 #Short function to change values in a list to complex numbers
@@ -56,7 +54,6 @@ def imaginator(LIST, demaginate=False):
     else:
         for i, ele in enumerate(LIST):
             LIST[i] = 1j * ele
-    del(i, ele)
     return LIST
 #No, it wasn't necessary to write a function for this too but I'm doing it anyway
 #------------------------------------------------------------------------------------------
@@ -68,7 +65,6 @@ def EMT(NM, KM, NI, KI, V=.5):
     M, I = NM + KM, NI + KI
     F = (I ** 2 - M ** 2) / (I + 2.0 * M)
     AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
-    del(NM, KM, NI, KI, V, M, I, F)
     return float(real(AMOC)), float(imag(AMOC))
 #End short EMT function... wait what this is it?
 #---------------------------------------------
