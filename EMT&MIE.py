@@ -5,18 +5,16 @@
     Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
     
     TODO:
-    	-Deimpliment the 'as's from the importations
-	-Remove superflous & misleading interper function
-	-Remove the unecessary dictUpdate function
-	-Rename Kate's waves to something more general
     	-Impliment MIE theory
 	-
 '''
 
 #import matplotlib.pyplot as plt
-from numpy import interp, real as rl, imag as im
-from kmod import whiteSpaceParser, getStart as GS, getCol as GC, listifier as li, columnizer as clm
-from cmath import sqrt as sqrt
+from numpy import interp, real, imag
+#interp(x-coord of desired interpolates, x-coord of input data, y-coord of input data)
+#Returns a numpy array object; this can be quickly converted to a standard python list
+from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
+from cmath import sqrt
 
 #------------------------------------------------------
 #- Short functions which simplify (maybe) some things -
@@ -28,21 +26,9 @@ def trimmer(LIST, mini, maxi):
     for ele in LIST:
         if ele >= mini and ele <= maxi:
             tempList.append(ele)
+    del(LIST, mini, maxi)
     return tempList
 #End trimming function
-#---------------------------------------------------
-#Short function to update dictionaries with new data because I'm /this/ lazy
-def dictUpdate(dictName, LIST, KEYNAME):
-    dictName.update({KEYNAME:LIST})
-#End dictionary updater
-#-------------------------------------------------------------------------------
-#Short function to ease doing /this/ again and again and again and again and...
-#interp(x-coord of desired interpolates, x-coord of input data, y-coord of input data)
-#returns a numpy array object; should be converted to standard python list obj
-def interper(x, y):
-    tempList = list(interp(Kates['WAV'], x, y))
-    return tempList
-#End short function for ease of not doing whatever /this/ was
 #-------------------------------------------------------------
 #Short function to write to a file data from a dicitonary
 #Python doesn't care if we want the string read-in as a raw string
@@ -59,16 +45,18 @@ def writer(DICT, FILENAME):
         tempFile.write('\n')
         row += 1
     tempFile.close()
+    del(DICT, FILENAME, tempFile, row)
 #End short writing function
 #------------------------------------------------------------
 #Short function to change values in a list to complex numbers
 def imaginator(LIST, demaginate=False):
     if demaginate:
         for i, ele in enumerate(LIST):
-            LIST[i] = float(im(ele))
+            LIST[i] = float(imag(ele))
     else:
         for i, ele in enumerate(LIST):
             LIST[i] = 1j * ele
+    del(i, ele)
     return LIST
 #No, it wasn't necessary to write a function for this too but I'm doing it anyway
 #------------------------------------------------------------------------------------------
@@ -80,8 +68,9 @@ def EMT(NM, KM, NI, KI, V=.5):
     M, I = NM + KM, NI + KI
     F = (I ** 2 - M ** 2) / (I + 2.0 * M)
     AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
-    return float(rl(AMOC)), float(im(AMOC))
-#End short EMT function
+    del(NM, KM, NI, KI, V, M, I, F)
+    return float(real(AMOC)), float(imag(AMOC))
+#End short EMT function... wait what this is it?
 #---------------------------------------------
 #- File directories for the necessary tables -
 #---------------------------------------------
@@ -101,18 +90,16 @@ dir_DI = directory + r'\DirtyIceOptConst.dat'
 #Water Optical Constants
 dir_WA = directory + r'\waterOpticalConstants.dat'
 
-#Kate's Waves
-dir_KW = directory + r'\wav_set.dat'
+#Desired Wavelengths
+dir_W = directory + r'\wav_set.dat'
 
-#Kate's Grain Sizes; table is currently unreadable by my modules so it needs to manually
+#Desired Grain Sizes; current table is currently unreadable by my modules so it needs to manually
 #be modified; sorry!
-dir_KG = directory + r'\grain_size_grid_suvsil.list'
-
+dir_G = directory + r'\grain_size_grid_suvsil.list'
 
 #-----------------------------------------------
 #- Writing data from tables in files to memory -
 #-----------------------------------------------
-
 #--------------------
 #- Amorphous Carbon -
 #--------------------
@@ -121,10 +108,16 @@ dir_KG = directory + r'\grain_size_grid_suvsil.list'
 AC_Tab = open(dir_AC, 'rb')
 
 #Start the reader at the appropriate postion
-AC_Tab.seek(GS(AC_Tab))
+AC_Tab.seek(getStart(AC_Tab))
 
 #Do the thing! Seperate the values!
-mList = clm(li(wsp(AC_Tab.read())), GC(AC_Tab))
+#Assign to mList the list of lists returned from Columnizer which took a single
+#list returned by listifier (as well as the number of columns in the table
+#found using the getCol module) which itself took a tuple returned by
+#whiteSpaceParser which consisted of the modified contents of the read file
+#in addition to the index location of whitespaces in that file.
+#For more information, check kmod.py
+mList = columnizer(listifier(whiteSpaceParser(AC_Tab.read())), getCol(AC_Tab))
 AmorphCarb = {'WAV':mList[0], 'N':mList[1], 'K':mList[2]}
 
 #Close the file and delete variables no longer needed
@@ -137,9 +130,9 @@ del(AC_Tab, mList, dir_AC)
 #Similar proceedure for AstroSil
 AS_Tab = open(dir_AS, 'rb')
 
-AS_Tab.seek(GS(AS_Tab))
+AS_Tab.seek(getStart(AS_Tab))
 
-mList = clm(li(wsp(AS_Tab.read())), GC(AS_Tab))
+mList = columnizer(listifier(whiteSpaceParser(AS_Tab.read())), getCol(AS_Tab))
 
 #Values must be put in reverse order for ease of interpolation later
 #Reversing can't be done in a dictionary assignment because it returns
@@ -165,9 +158,9 @@ del(AS_Tab, mList, dir_AS, i, ele)
 #Similar proceedure for Dirty Ice
 DI_Tab = open(dir_DI, 'rb')
 
-DI_Tab.seek(GS(DI_Tab))
+DI_Tab.seek(getStart(DI_Tab))
 
-mList = clm(li(wsp(DI_Tab.read())), GC(DI_Tab))
+mList = columnizer(listifier(whiteSpaceParser(DI_Tab.read())), getCol(DI_Tab))
 
 DirtyIce = {'WAV':mList[0], 'N':mList[1], 'K':mList[2]}
 
@@ -181,9 +174,9 @@ del(DI_Tab, mList, dir_DI)
 #Similar proceedure for Water
 WA_Tab = open(dir_WA, 'rb')
 
-WA_Tab.seek(GS(WA_Tab))
+WA_Tab.seek(getStart(WA_Tab))
 
-mList = clm(li(wsp(WA_Tab.read())), GC(WA_Tab))
+mList = columnizer(listifier(whiteSpaceParser(WA_Tab.read())), getCol(WA_Tab))
 
 Water = {'WAV':mList[0], 'N':mList[1], 'K':mList[2]}
 
@@ -191,45 +184,45 @@ WA_Tab.close()
 
 del(WA_Tab, mList, dir_WA)
 
-#----------------
-#- Kate's Waves -
-#----------------
-#Similar proceedure for Kate's Waves
-KW_Tab = open(dir_KW, 'rb')
+#-----------------
+#- Desired Waves -
+#-----------------
+#Similar proceedure for the desired wavelengths
+W_Tab = open(dir_W, 'rb')
 
-KW_Tab.seek(GS(KW_Tab))
+W_Tab.seek(getStart(W_Tab))
 
-mList = clm(li(wsp(KW_Tab.read())), GC(KW_Tab))
+mList = columnizer(listifier(whiteSpaceParser(W_Tab.read())), getCol(W_Tab))
 
-Kates = {'WAV':mList[0]}
+Waves = {'WAV':mList[0]}
 
-KW_Tab.close()
+W_Tab.close()
 
-del(KW_Tab, mList, dir_KW)
+del(W_Tab, mList, dir_W)
 
-#----------------------
-#- Kate's Grain Sizes -
-#----------------------
-#A litte different proceedure for Kate's Grain Sizes
-KG_Tab = open(dir_KG, 'rb')
+#-----------------------
+#- Desired Grain Sizes -
+#-----------------------
+#A litte different proceedure for the desired Grain Sizes
+G_Tab = open(dir_G, 'rb')
 
-KG_Tab.seek(GS(KG_Tab))
+G_Tab.seek(getStart(G_Tab))
 
-mList = clm(li(wsp(KG_Tab.read())), GC(KG_Tab))
+mList = columnizer(listifier(whiteSpaceParser(G_Tab.read())), getCol(G_Tab))
 
-dictUpdate(Kates, mList[0], 'SIZE')
+Waves.update({'SIZE':mList[0]})
 
-KG_Tab.close()
+G_Tab.close()
 
-del(KG_Tab, mList, dir_KG)
+del(G_Tab, mList, dir_G)
 
 #-----------------------------------------------------------
 #- Trimming Wave lists for useful wavelengths; the prequel - 
 #-----------------------------------------------------------
-#New wavelengths for Kates based on DirtyIce; determines wavelength for all others.
+#New wavelengths based on DirtyIce; determines wavelength for all others.
 #As this is needed for interpolation it must be done before the interpolation
 #but assignment to other dictionaries must be done after
-dictUpdate(Kates, trimmer(Kates['WAV'], min(DirtyIce['WAV']), max(DirtyIce['WAV'])), 'WAV')
+Waves.update({'WAV':trimmer(Waves['WAV'], min(DirtyIce['WAV']), max(DirtyIce['WAV']))})
 
 #---------------------------------------------------------------------------
 #- Interpolate using SciPy's (NumPy's?) interp function for missing values -
@@ -240,51 +233,51 @@ dictUpdate(Kates, trimmer(Kates['WAV'], min(DirtyIce['WAV']), max(DirtyIce['WAV'
 #out why
 
 #Update Amorphous Carbon Dict with interpolates for reals
-dictUpdate(AmorphCarb, interper(AmorphCarb['WAV'], AmorphCarb['N']), 'N')
+AmorphCarb.update({'N':list(interp(Waves['WAV'], AmorphCarb['WAV'], AmorphCarb['N']))})
 
 #Update Amorphous Carbon Dict with interpolates for complex
-dictUpdate(AmorphCarb, imaginator(interper(AmorphCarb['WAV'], AmorphCarb['K'])), 'K')
+AmorphCarb.update({'K':imaginator(list(interp(Waves['WAV'], AmorphCarb['WAV'], AmorphCarb['K'])))})
 
 #Update AstroSil Dict with interpolates for reals
-dictUpdate(AstroSil, interper(AstroSil['WAV'], AstroSil['N']), 'N')
+AstroSil.update({'N':list(interp(Waves['WAV'], AstroSil['WAV'], AstroSil['N']))})
 
 #Update AstroSil Dict with interpolates for complex
-dictUpdate(AstroSil, imaginator(interper(AstroSil['WAV'], AstroSil['K'])), 'K')
+AstroSil.update({'K':imaginator(list(interp(Waves['WAV'], AstroSil['WAV'], AstroSil['K'])))})
 
 #Update DirtyIce Dict with interpolates for reals
-dictUpdate(DirtyIce, interper(DirtyIce['WAV'], DirtyIce['N']), 'N')
+DirtyIce.update({'N':list(interp(Waves['WAV'], DirtyIce['WAV'], DirtyIce['N']))})
 
 #Update DirtyIce Dict with interpolates for complex
-#dictUpdate(DirtyIce, imaginator(interper(DirtyIce['WAV'], DirtyIce['K'])), 'K')
-dictUpdate(DirtyIce, interper(DirtyIce['WAV'], DirtyIce['K']), 'K')
+#DirtyIce.update({'K':imaginator(list(interp(Waves['WAV'], DirtyIce['WAV'], DirtyIce['K']))}))
+DirtyIce.update({'K':list(interp(Waves['WAV'], DirtyIce['WAV'], DirtyIce['K']))})
 
 #Update Water Dict with interpolates for reals
-dictUpdate(Water, interper(Water['WAV'], Water['N']), 'N')
+Water.update({'N':list(interp(Waves['WAV'], Water['WAV'], Water['N']))})
 
 #Update Water Dict with interpolates for complex
-dictUpdate(Water, imaginator(interper(Water['WAV'], Water['K'])), 'K')
+Water.update({'K':imaginator(list(interp(Waves['WAV'], Water['WAV'], Water['K'])))})
 
 #----------------------------------------------------------
 #- Trimming Wave lists for useful wavelengths; the sequel - 
 #----------------------------------------------------------
 #New wavelengths for Amorphous Carbon
-dictUpdate(AmorphCarb, Kates['WAV'], 'WAV')
+AmorphCarb.update({'WAV':Waves['WAV']})
 
 #New wavelengths for AstroSil
-dictUpdate(AstroSil, Kates['WAV'], 'WAV')
+AstroSil.update({'WAV':Waves['WAV']})
 
 #New wavelengths for Water
-dictUpdate(Water, Kates['WAV'], 'WAV')
+Water.update({'WAV':Waves['WAV']})
 
 #New wavelengths for DirtyIce
-dictUpdate(DirtyIce, Kates['WAV'], 'WAV')
+DirtyIce.update({'WAV':Waves['WAV']})
 
 #--------------------------------------------------------------
 #- Computing Optical Constants for Inclusion-Matrix Particles -
 #--------------------------------------------------------------
 #Finally doing part of what this program is named after! Yay!
 #Initialize the Optical Constants dictionary
-IMPOptConst = {'WAV':Kates['WAV'], 'N':[], 'K':[]}
+IMPOptConst = {'WAV':Waves['WAV'], 'N':[], 'K':[]}
 
 #Iterate through the Water reals and utilize EMT to generate new
 #optical constants
@@ -332,9 +325,9 @@ def flot(DICT, y):
     plt.grid(True)
     plt.show()
 
-flot(Water, 'N')
-flot(IMPOptConst, 'N')
-flot(AstroSil, 'N')
-flot(AmorphCarb, 'N')
-flot(DirtyIce, 'N')
+flot(Water, 'K')
+flot(IMPOptConst, 'K')
+flot(AstroSil, 'K')
+flot(AmorphCarb, 'K')
+flot(DirtyIce, 'K')
 '''
