@@ -6,6 +6,7 @@
     
     TODO:
     	-Impliment MIE theory
+	-Consider other stylistic changes as per suggestion
 	-
 '''
 
