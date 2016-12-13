@@ -6,8 +6,8 @@
     
     TODO:
     	-Impliment MIE theory
+	-Change to usage of pickle
 	-Consider other stylistic changes as per suggestion
-	-
 '''
 
 #import matplotlib.pyplot as plt
@@ -36,12 +36,12 @@ def trimmer(LIST, mini, maxi):
 def writer(DICT, FILENAME):
     tempFile = open(directory + '\\' + FILENAME, 'w')
     for ele in DICT.keys():
-        tempFile.write(str(ele) + ' ')
+        tempFile.write(str(ele) + ',')
     tempFile.write('\n')
     row = 0
     while row < len(DICT[DICT.keys()[0]]):
         for key in DICT.keys():
-            tempFile.write(str((DICT[key][row])) + ' ')
+            tempFile.write(str((DICT[key][row])) + ',')
         tempFile.write('\n')
         row += 1
     tempFile.close()
@@ -67,7 +67,7 @@ def EMT(NM, KM, NI, KI, V=.5):
     F = (I ** 2 - M ** 2) / (I + 2.0 * M)
     AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
     return float(real(AMOC)), float(imag(AMOC))
-#End short EMT function... wait what this is it?
+#End short EMT function... it's very small
 #---------------------------------------------
 #- File directories for the necessary tables -
 #---------------------------------------------
@@ -307,6 +307,16 @@ imaginator(AstroSil['K'], True)
 
 imaginator(Water['K'], True)
 
+WRITE = False
+
+if WRITE:
+    writer(AmorphCarb, 'AmorphCarbInterp.csv')
+    writer(AstroSil, 'AstroSilInterp.csv')
+    writer(DirtyIce, 'DirtyIceInterp.csv')
+    writer(Water, 'WaterInterp.csv')
+    writer(IMPOptConst, 'IMPOptConst.csv')
+    
+
 '''
 def flot(DICT, y):
     if y == 'K':
@@ -321,7 +331,6 @@ def flot(DICT, y):
     plt.xlabel('Wavelength (microns)')    
     plt.grid(True)
     plt.show()
-
 flot(Water, 'K')
 flot(IMPOptConst, 'K')
 flot(AstroSil, 'K')
