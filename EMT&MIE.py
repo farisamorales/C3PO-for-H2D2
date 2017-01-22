@@ -5,10 +5,10 @@
     Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
     
     TODO:
-    	-Impliment MIE theory
-	-Change to usage of pickle
-	-Generalize variable names to accomodate other substances?
-	-Make stylistic changes as per suggestion
+		-Impliment MIE theory
+		-Change to usage of pickle
+		-Generalize variable names to accomodate other substances?
+		-Make stylistic changes as per suggestion
 '''
 
 from numpy import interp, real, imag
@@ -23,7 +23,7 @@ from cmath import sqrt
 #--------------------
 #For whether or not we will be making our own polluted matrix prior to re-inclusion; 
 #if true we do not make our own
-preDMat = False
+preDMat = True
 
 #For whether or not we will be writing new lists to memory. If True, we will
 #write to memory the results of both interpolations and EMT
@@ -107,7 +107,7 @@ def imaginator(LIST, demaginate=False):
 #NI: Refractive Index of Inclusion, KI: Extinction Coefficient of Inclusion
 #V: Ratio of pollutant volume to total volume
 def EMT(NM, KM, NI, KI, V=.5):
-    M, I = NM + KM, NI + KI
+    M, I = (NM + KM) ** 2, (NI + KI) ** 2
     F = (I - M) / (I + 2.0 * M)
     AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
     return float(real(AMOC)), float(imag(AMOC))
@@ -372,18 +372,18 @@ if GRAPH:
         elif y == 'N':
             plt.ylabel('Refractive Index')
             plt.title('Refractive Index Vs. Wavelength')
-            plt.plot(DICT['WAV'], DICT[y])
-            plt.xscale('log')
-            plt.xlabel('Wavelength (microns)')    
-            plt.grid(True)
-            plt.show()
+        plt.plot(DICT['WAV'], DICT[y])
+        plt.xscale('log')
+        plt.xlabel('Wavelength (microns)')    
+        plt.grid(True)
+        plt.show()
     
     if not preDMat:          
         flot(Water, 'N')
         flot(AmorphCarb, 'N')
     else:
-       flot(DirtyIce, 'N') 
-    flot(IMPOptConst, 'N')
-    flot(AstroSil, 'N')
+       flot(DirtyIce, 'K') 
+    flot(IMPOptConst, 'K')
+    flot(AstroSil, 'K')
     
     
