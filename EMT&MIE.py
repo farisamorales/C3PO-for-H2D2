@@ -6,17 +6,19 @@
     
     TODO:
 		-Impliment MIE theory
-		-Change to usage of pickle
+		-Change to usage of numpy readers(?)
 		-Generalize variable names to accomodate other substances?
 		-Make stylistic changes as per suggestion
+        -Modify flot to graph lines in one plot when not run in Spyder
 '''
 
-from numpy import interp, real, imag
+from numpy import interp, real, imag, pi
 #interp(x-coord of desired interpolates, x-coord of input data, y-coord of input data)
 #Returns a numpy array object; this can be quickly converted to a standard python list
 #I don't know if it's necessary (probably not) but I do it anyway just in case
 from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
 from cmath import sqrt
+
 
 #--------------------
 #- Global Variables -
@@ -31,7 +33,11 @@ WRITE = False
 
 #For whether or not we will be generating graphs of the results of the intpolations
 #and of EMT. If true, we graph these results as functions of the wavelength
-GRAPH = True
+GRAPH = False
+
+#For whether or not we will be running MIE theory on the optical constants calculated
+#here. The value of this constant should be self-explanitory to what it means.
+RUNMIE = True
 
 #---------------------------------------------
 #- File directories for the necessary tables -
@@ -157,6 +163,13 @@ if not preDMat:
 
     del(WA_Tab, mList, dir_WA)
 
+    #----------------------
+    #- Itermediary Matrix -
+    #----------------------
+    #For graphing purposes
+    IMM = {'WAV':[], 'N':[], 'K':[]}
+    
+    
 else:
     #-------------
     #- Dirty Ice -
@@ -239,7 +252,7 @@ del(G_Tab, mList, dir_G)
 #-----------------------------------------------------------
 #New wavelengths based on Primary Matrix Material; determines wavelength for all others.
 #As this is needed for interpolation it must be done before the interpolation
-#but assignment to other dictionaries must be done after
+#but assignment to other dictionaries must be done after.
 if not preDMat:
     Waves.update({'WAV':trimmer(Waves['WAV'], min(Water['WAV']), max(Water['WAV']))})
 
@@ -291,6 +304,9 @@ if not preDMat:
 
     #New wavelengths for Water
     Water.update({'WAV':Waves['WAV']})
+    
+    #New wavelengths for the intermediary matrix
+    IMM.update({'WAV':Waves['WAV']})
 
 else:
     #New wavelengths for DirtyIce
@@ -314,15 +330,21 @@ if not preDMat:
     
         #Utilize EMT for Amorphous Carbon and Water
         N, K = EMT(ele, Water['K'][i], AmorphCarb['N'][i], AmorphCarb['K'][i])
-    
+
+        #Append the appropriate values to the IMM dictionary
+        IMM['N'].append(N)
+        if K < 0:
+            K = 1e-11
+        IMM['K'].append(K)
+
         #Utilize the results from the last utilization of EMT for this run of EMT
         #now with AstroSil
-        N, K = EMT(N, K, AstroSil['N'][i], AstroSil['K'][i])
+        N, K = EMT(IMM['N'][i], IMM['K'][i], AstroSil['N'][i], AstroSil['K'][i])
     
         #Append the appropriate values to the IMP dictionary
         IMPOptConst['N'].append(N)
         if K < 0:
-            K = 1e-11
+            K = 1.0e-11
         IMPOptConst['K'].append(K)
             
 else:
@@ -339,20 +361,6 @@ else:
 
 del(i, ele, N, K)
 
-#------------------------------------------------
-#- Modify complex coefficients to be real again -
-#------------------------------------------------
-#Must be done else MatPlotLib complains when attempting to plot the values
-if not preDMat:
-    imaginator(AmorphCarb['K'], True)
-
-    imaginator(Water['K'], True)
-
-else:
-    imaginator(DirtyIce['K'], True)
-    
-imaginator(AstroSil['K'], True)
-
 if WRITE:
     if not preDMat:
         writer(AmorphCarb, 'AmorphCarbInterp2.csv')
@@ -363,6 +371,25 @@ if WRITE:
     writer(IMPOptConst, 'IMPOptConst2.csv')
     
 if GRAPH:
+#------------------------------------------------
+#- Modify complex coefficients to be real again -
+#------------------------------------------------
+#Must be done else MatPlotLib complains when attempting to plot the values
+    if not preDMat:
+        imaginator(AmorphCarb['K'], True)
+
+        imaginator(Water['K'], True)
+
+    else:
+        imaginator(DirtyIce['K'], True)
+    
+    imaginator(AstroSil['K'], True)
+	
+#--------------------------------------------------
+#- Plot appropriate values if designated to do so -
+#--------------------------------------------------
+#Can only plot one data type at a time at this time
+#ie. can only plot extinction coefficients or refractive index
     import matplotlib.pyplot as plt
     def flot(DICT, y):
         if y == 'K':
@@ -381,9 +408,35 @@ if GRAPH:
     if not preDMat:          
         flot(Water, 'N')
         flot(AmorphCarb, 'N')
+        flot(IMM, 'N')
     else:
-       flot(DirtyIce, 'K') 
-    flot(IMPOptConst, 'K')
-    flot(AstroSil, 'K')
+        flot(DirtyIce, 'K') 
+    flot(AstroSil, 'N')
+    flot(IMPOptConst, 'N')
+
+if RUNMIE:
+#--------------
+#- MIE Theory -
+#--------------
+#Each refractive index value is associated with a particular wavelength.
+#Inside an iteration of the values of the refractive index, we iterate
+#through the grain sizes. We call bhmie with the size parameter associated
+#with that particular grain size with that particular wavelength, along
+#with the sum of the refractive index and extinction coefficient associated
+#with that wavelength. The resulting Emiss list is a list of lists; each
+#sublist is the emissivity of the grains of the various sizes associated
+#with the wavelength of incident light.
+    from bhmie_herbert_kaiser_july2012 import bhmie
     
-    
+    Emiss = []
+    for i, N in enumerate(IMPOptConst['N']):
+        Emiss.append([])
+        for size in Waves['SIZE']:
+            if type(IMPOptConst['K'][i]) != type(1j):
+                K = IMPOptConst['K'][i]*1j
+            else:
+                K = IMPOptConst['K'][i]
+            qabs = bhmie(2*pi*size/IMPOptConst['WAV'][i], N + K, [0])
+            if (qabs < 0):
+                qabs = 1.0e-11
+            Emiss[i].append(qabs)
