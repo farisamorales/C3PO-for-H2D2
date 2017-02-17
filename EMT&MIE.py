@@ -426,17 +426,28 @@ if RUNMIE:
 #with that wavelength. The resulting Emiss list is a list of lists; each
 #sublist is the emissivity of the grains of the various sizes associated
 #with the wavelength of incident light.
-    from bhmie_herbert_kaiser_july2012 import bhmie
+
+#Seems to give me something new everytime its run without changing anything!
+#Delete old dictionaries to free up memory for the Emiss array    
+    if not preDMat:    
+        del(AmorphCarb, Water, IMM)
+    else:
+        del(DirtyIce)
+    del(AstroSil)
+    
+    from bhmie_herbert_kaiser_july2012_GEOFF_EDITION import bhmie
     
     Emiss = []
-    for i, N in enumerate(IMPOptConst['N']):
+    for i, lamda in enumerate(Waves['WAV']):
         Emiss.append([])
-        for size in Waves['SIZE']:
+        for radius in Waves['SIZE']:
+            N = IMPOptConst['N'][i]
             if type(IMPOptConst['K'][i]) != type(1j):
                 K = IMPOptConst['K'][i]*1j
             else:
                 K = IMPOptConst['K'][i]
-            qabs = bhmie(2*pi*size/IMPOptConst['WAV'][i], N + K, [0])
-            if (qabs < 0):
+            qabs = bhmie((2*pi*radius)/lamda, N + K, 2)
+            if (qabs <= 0):
                 qabs = 1.0e-11
             Emiss[i].append(qabs)
+            #print(lamda, radius, N, K, i, len(Emiss), len(Emiss[i]))
