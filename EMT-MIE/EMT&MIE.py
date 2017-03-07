@@ -16,7 +16,11 @@ from numpy import interp, real, imag, pi
 #I don't know if it's necessary (probably not) but I do it anyway just in case
 from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
 from cmath import sqrt
+from os import times
 
+TIME1 = times()[0]
+
+print('Initializing...')
 
 #--------------------
 #- Global Variables -
@@ -27,11 +31,11 @@ preDMat = True
 
 #For whether or not we will be running MIE theory on the optical constants calculated
 #here. The value of this constant should be self-explanitory to what it means.
-RUNMIE = False
+RUNMIE = True
 
 #For whether or not we will be writing new lists to memory. If True, we will
 #write to memory the results of both interpolations and EMT
-WRITE = True
+WRITE = False
 if WRITE:
 	WRITE_INT = True
 	WRITE_EMT = True
@@ -40,7 +44,7 @@ if WRITE:
 
 #For whether or not we will be generating graphs of the results of the intpolations
 #and of EMT. If true, we graph these results as functions of the wavelength
-GRAPH = True
+GRAPH = False
 
 
 
@@ -129,6 +133,8 @@ def EMT(NM, KM, NI, KI, V=.5):
 #-----------------------------------------------
 #- Writing data from tables in files to memory -
 #-----------------------------------------------
+
+print('Writing Required Files to Memory...')
 
 if not preDMat:
 	#--------------------
@@ -223,9 +229,9 @@ AS_Tab.close()
 del(AS_Tab, mList, dir_AS, i, ele)
 
 #-----------------
-#- Desired Wavelength(Microns)es -
+#- Desired Waves -
 #-----------------
-#Similar proceedure for the desired Wavelength(Microns)elengths
+#Similar proceedure for the desired Wavelengths
 W_Tab = open(dir_W, 'rb')
 
 W_Tab.seek(getStart(W_Tab))
@@ -255,11 +261,14 @@ G_Tab.close()
 del(G_Tab, mList, dir_G)
 
 #-----------------------------------------------------------
-#- Trimming Wavelength(Microns)e lists for useful Wavelength(Microns)elengths; the prequel - 
+#- Trimming Wave lists for useful Wavelengths; the prequel - 
 #-----------------------------------------------------------
-#New Wavelength(Microns)elengths based on Primary Matrix Material; determines Wavelength(Microns)elength for all others.
+#New Wavelengths based on Primary Matrix Material; determines Wavelength for all others.
 #As this is needed for interpolation it must be done before the interpolation
 #but assignment to other dictionaries must be done after.
+
+print('Trimming Wave List...')
+
 if not preDMat:
 	Waves.update({'Wavelength(Microns)':trimmer(Waves['Wavelength(Microns)'], min(Water['Wavelength(Microns)']), max(Water['Wavelength(Microns)']))})
 
@@ -273,6 +282,8 @@ else:
 #into complex type. For some reason I get erroneous optical constants from EMT if
 #I change these into complex numbers piecewise during EMT, I still can't figure
 #out why
+
+print('Interpolating for Missing Values and Updating the Appropriate Dictionaries...')
 
 if not preDMat:
 	#Update Amorphous Carbon Dict with interpolates for reals
@@ -302,8 +313,10 @@ AstroSil.update({'Refractive Index':list(interp(Waves['Wavelength(Microns)'], As
 AstroSil.update({'Extinction Coefficient':imaginator(list(interp(Waves['Wavelength(Microns)'], AstroSil['Wavelength(Microns)'], AstroSil['Extinction Coefficient'])))})
 
 #----------------------------------------------------------
-#- Trimming Wavelength(Microns)e lists for useful Wavelength(Microns)elengths; the sequel - 
+#- Trimming Wave lists for useful Wavelengths; the sequel - 
 #----------------------------------------------------------
+
+print('Doin\' some more Trimming...')
 
 if not preDMat:
 	#New Wavelength(Microns)elengths for Amorphous Carbon
@@ -327,6 +340,9 @@ AstroSil.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 #--------------------------------------------------------------
 #Finally doing part of what this program is named after! Yay!
 #Initialize the Optical Constants dictionary
+
+print('Implimenting EMT to Compute Optical Constants...')
+
 IMPOptConst = {'Wavelength(Microns)':Waves['Wavelength(Microns)'], 'Refractive Index':[], 'Extinction Coefficient':[], 'NAME':'Inclusion Matrix Particles'}
 
 #Iterate through designated reals and utilize EMT to generate new
@@ -369,6 +385,9 @@ else:
 del(i, ele, RI, EC)
 
 if WRITE:
+
+	print('Writing Data to Disk...')
+
 	if WRITE_INT:
 		if not preDMat:
 			writer(AmorphCarb, 'AmorphCarbInterp2.csv')
@@ -384,6 +403,9 @@ if GRAPH:
 #- Modify complex coefficients to be real again -
 #------------------------------------------------
 #Must be done else MatPlotLib complains when attempting to plot the values
+
+	print('De-imaginating some Values for Graphing Purposes...')
+
 	if not preDMat:
 		imaginator(AmorphCarb['Extinction Coefficient'], True)
 		imaginator(Water['Extinction Coefficient'], True)
@@ -438,7 +460,10 @@ if RUNMIE:
 #with the Wavelength(Microns)elength of incident light.
 
 #Seems to give me something new everytime its run without changing anything!
-#Delete old dictionaries to free up memory for the Emiss array	
+#Delete old dictionaries to free up memory for the Emiss array
+
+	print('Utilizing MIE Theory to Calculate Emissivity of the IMPs; This can take some time...')
+
 	if not preDMat:
 		del(AmorphCarb, Water, IMM)
 	else:
@@ -448,11 +473,11 @@ if RUNMIE:
 	from bhmie_herbert_kaiser_july2012_GEOFF_EDITION import bhmie
 	Emiss = {}
 	for radius in Waves['SIZE']:
-		print(radius)
+		print('Emissivites for grains of radius: ' + str(radius) + ' microns')
 		Emiss.update({radius:[]})
 		for i, lamda in enumerate(Waves['Wavelength(Microns)']):
 			RI = IMPOptConst['Refractive Index'][i]
-			if type(IMPOptConst['Extinction Coefficient'][i]) != type(1j):
+			if type(IMPOptConst['Extinction Coefficient'][i]) is not type(1j):
 				EC = IMPOptConst['Extinction Coefficient'][i]*1j
 			else:
 				EC = IMPOptConst['Extinction Coefficient'][i]
@@ -463,4 +488,5 @@ if RUNMIE:
 			#print(radius, lamda, Refractive Index, Extinction Coefficient, i, len(Emiss), len(Emiss[radius]))
 if WRITE and WRITE_MIE:
 	writer(Emiss, 'Emissivities.csv')
+print('Run Time: ' + str(times()[0] - TIME1))
 raw_input('Press ENTER to exit')
