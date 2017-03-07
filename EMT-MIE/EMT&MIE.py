@@ -398,9 +398,9 @@ if GRAPH:
 #--------------------------------------------------
 	import matplotlib.pyplot as plt
 	def flot(*flargs):
-		plt.xlabel('Wavelength(Microns)elength (microns)')
+		plt.xlabel('Wavelength(Microns)')
 		plt.ylabel('Exitinction Coefficient')
-		plt.title('Extinction Coefficient Vs. Wavelength(Microns)elength')
+		plt.title('Extinction Coefficient Vs. Wavelength')
 		plt.xscale('log')
 		plt.yscale('log')
 		plt.grid(True)
@@ -409,9 +409,9 @@ if GRAPH:
 		plt.legend()
 		plt.show()
 		
-		plt.xlabel('Wavelength(Microns)elength (microns)')
+		plt.xlabel('Wavelength(Microns)')
 		plt.ylabel('Refractive Index')
-		plt.title('Refractive Index Vs. Wavelength(Microns)elength')
+		plt.title('Refractive Index Vs. Wavelength')
 		plt.xscale('log')
 		plt.grid(True)
 		for Refracti in flargs:
