@@ -16,6 +16,7 @@ from numpy import interp, real, imag, pi
 #I don't know if it's necessary (probably not) but I do it anyway just in case
 from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
 from cmath import sqrt
+from math import log10
 from os import times
 
 TIME1 = times()[0]
@@ -44,13 +45,22 @@ if WRITE:
 
 #For whether or not we will be generating graphs of the results of the intpolations,
 #EMT, and if running MIE, the results of MIE theory.
-GRAPH = False
+GRAPH = True
 if GRAPH:
-	GRAPH_EMT = True
+	GRAPH_EMT = False
 	if RUNMIE:
 		GRAPH_MIE = True
+	import matplotlib.pyplot as plt
 
-print('Global Variables:\n\tpreDMat-' + str(preDMat) + '\n\tRUNMIE-' + str(RUNMIE) + '\n\tWRITE-' + str(WRITE) + '\n\tGRAPH-' + str(GRAPH))
+print('Orbital Variables:\n\tpreDMat-' + str(preDMat) + '\n\tRUNMIE-' + str(RUNMIE) + '\n\tWRITE-' + str(WRITE) + '\n\tGRAPH-' + str(GRAPH) + '\nSuborbital Variables:')
+if WRITE:
+	print('\tWRITE_INT- ' + str(WRITE_INT) + '\n\tWRITE_EMT- ' + str(WRITE_EMT))
+	if RUNMIE:
+		print('\tWRITE_MIE- ' + str(WRITE_MIE))
+if GRAPH:
+	print('\tGRAPH_EMT- ' + str(GRAPH_EMT))
+	if RUNMIE:
+		print('\tGRAPH_MIE- ' + str(GRAPH_MIE))
 
 #---------------------------------------------
 #- File directories for the necessary tables -
@@ -425,8 +435,7 @@ if WRITE:
 		print('Writing EMT Data to disk...')
 		writerD(IMPOptConst, 'IMPOptConst2.csv')
 	
-if GRAPH:
-	import matplotlib.pyplot as plt
+if GRAPH and GRAPH_EMT:
 #------------------------------------------------
 #- Modify complex coefficients to be real again -
 #------------------------------------------------
@@ -446,54 +455,45 @@ if GRAPH:
 #--------------------------------------------------
 #- Plot appropriate values if designated to do so -
 #--------------------------------------------------
-	if GRAPH_EMT:
-		def flotEMT(*flargs):
-			plt.xlabel('Wavelength(Microns)')
-			plt.ylabel('Exitinction Coefficient')
-			plt.title('Extinction Coefficient Vs. Wavelength')
-			plt.xscale('log')
-			plt.yscale('log')
-			plt.grid(True)
-			for Exti in flargs:
-				plt.plot(Exti['Wavelength(Microns)'], Exti['Extinction Coefficient'], label = Exti['NAME'])
-			plt.legend()
-			plt.show()
-			
-			plt.xlabel('Wavelength(Microns)')
-			plt.ylabel('Refractive Index')
-			plt.title('Refractive Index Vs. Wavelength')
-			plt.xscale('log')
-			plt.grid(True)
-			for Refracti in flargs:
-				plt.plot(Refracti['Wavelength(Microns)'], Refracti['Refractive Index'], label = Refracti['NAME'])
-			plt.legend(loc = 2)
-			plt.show()
-
-		if not preDMat:		  
-			flotEMT(Water, AmorphCarb, IMM, AstroSil, IMPOptConst)
-		else:
-			flotEMT(DirtyIce, AstroSil, IMPOptConst)
-	'''if GRAPH_MIE:
-		def flotMIE(*flargs):
+	def flotEMT(*flargs):
 		plt.xlabel('Wavelength(Microns)')
-		plt.ylabel('Emissivity')
-		plt.title('Emissivity Vs. Wavelength')
+		plt.ylabel('Exitinction Coefficient')
+		plt.title('Extinction Coefficient Vs. Wavelength')
 		plt.xscale('log')
 		plt.yscale('log')
 		plt.grid(True)
-'''
+		for Exti in flargs:
+			plt.plot(Exti['Wavelength(Microns)'], Exti['Extinction Coefficient'], label = Exti['NAME'])
+		plt.legend()
+		plt.show()
+		
+		plt.xlabel('Wavelength(Microns)')
+		plt.ylabel('Refractive Index')
+		plt.title('Refractive Index Vs. Wavelength')
+		plt.xscale('log')
+		plt.grid(True)
+		for Refracti in flargs:
+			plt.plot(Refracti['Wavelength(Microns)'], Refracti['Refractive Index'], label = Refracti['NAME'])
+		plt.legend(loc = 2)
+		plt.show()
+
+	if not preDMat:		  
+		flotEMT(Water, AmorphCarb, IMM, AstroSil, IMPOptConst)
+	else:
+		flotEMT(DirtyIce, AstroSil, IMPOptConst)
+
 if RUNMIE:
 #--------------
 #- MIE Theory -
 #--------------
-#Each refractive index value is associated with a particular Wavelength(Microns)elength.
+#Each refractive index value is associated with a particular Wavelength.
 #Inside an iteration of the values of the refractive index, we iterate
 #through the grain sizes. We call bhmie with the size parameter associated
-#with that particular grain size with that particular Wavelength(Microns)elength, along
+#with that particular grain size with that particular Wavelength, along
 #with the sum of the refractive index and extinction coefficient associated
-#with that Wavelength(Microns)elength. The resulting Emiss list is a list of lists; each
+#with that Wavelength. The resulting Emiss list is a list of lists; each
 #sublist is the emissivity of the grains of the various sizes associated
-#with the Wavelength(Microns)elength of incident light.
+#with the Wavelength of incident light.
 
 #Seems to give me something new everytime its run without changing anything!
 #Delete old dictionaries to free up memory for the Emiss array
@@ -511,7 +511,7 @@ if RUNMIE:
 	Time0 = times()[0]
 	sizey = len(Waves['SIZE'])
 	for iter, radius in enumerate(Waves['SIZE']):
-		print('Emissivites for grains of radius: ' + str(radius) + ' microns. ' + str(iter) + ' of ' + str(sizey) + '.\nTime for last radius: ' + str(times()[0] - Time0) + ' seconds')
+		print('Emissivites for grains of radius: ' + str(radius) + ' microns. ' + str(iter + 1) + ' of ' + str(sizey) + '.\nTime for last radius: ' + str(times()[0] - Time0) + ' seconds')
 		Time0 = times()[0]
 		Emiss.append([radius])
 		for i, lamda in enumerate(Waves['Wavelength(Microns)']):
@@ -528,5 +528,22 @@ if RUNMIE:
 if WRITE and WRITE_MIE:
 	print('Writing MIE Data to disk...')
 	writerE(Waves['Wavelength(Microns)'], Emiss, 'Emissivities.csv')
+
+if GRAPH and GRAPH_MIE:
+	def flotMIE(EMISS):
+		plt.xlabel('Wavelength(Microns)')
+		plt.ylabel('Emissivity')
+		plt.title('Emissivity Vs. Wavelength')
+		plt.xscale('log')
+		plt.yscale('log')
+		plt.grid(True)
+		for ARRAY in EMISS:
+			if (log10(ARRAY[0]) == int(log10(ARRAY[0]))):
+				plt.plot(Waves['Wavelength(Microns)'], ARRAY[1:], label = ARRAY[0])
+		plt.legend(loc = 0)
+		plt.show()
+
+	flotMIE(Emiss)
+
 print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
 raw_input('Press ENTER to exit')
