@@ -1,1 +1,7 @@
-READ-ME!
+READ ME!
+Emissivity tables are formatted as a matrix with row indicies of grain sizes and column indicies of wavelengths.
+The top most row is the wavelengths (in microns).
+The left most column is the grain radius (in microns).
+
+To read-in these tables use the following:
+TBD
