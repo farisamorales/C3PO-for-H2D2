@@ -33,20 +33,24 @@ preDMat = True
 #here. The value of this constant should be self-explanitory to what it means.
 RUNMIE = True
 
-#For whether or not we will be writing new lists to memory. If True, we will
-#write to memory the results of both interpolations and EMT
-WRITE = False
+#For whether or not we will be writing new lists to memory. If true, checks if we want to
+#write the results of interpolations, EMT, and if running MIE, the results of MIE theory
+WRITE = True
 if WRITE:
-	WRITE_INT = True
-	WRITE_EMT = True
+	WRITE_INT = False
+	WRITE_EMT = False
 	if RUNMIE:
-		WRITE_MIE = False
+		WRITE_MIE = True
 
-#For whether or not we will be generating graphs of the results of the intpolations
-#and of EMT. If true, we graph these results as functions of the wavelength
+#For whether or not we will be generating graphs of the results of the intpolations,
+#EMT, and if running MIE, the results of MIE theory.
 GRAPH = False
+if GRAPH:
+	GRAPH_EMT = True
+	if RUNMIE:
+		GRAPH_MIE = True
 
-
+print('Global Variables:\n\tpreDMat-' + str(preDMat) + '\n\tRUNMIE-' + str(RUNMIE) + '\n\tWRITE-' + str(WRITE) + '\n\tGRAPH-' + str(GRAPH))
 
 #---------------------------------------------
 #- File directories for the necessary tables -
@@ -54,6 +58,8 @@ GRAPH = False
 
 #File directory for written tables
 directory = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
+
+print('File Directory:\n' + directory)
 
 if not preDMat:
 	#Amorphous Carbon Optical Constants
@@ -64,7 +70,7 @@ if not preDMat:
 
 else:
    #Dirty Ice Optical Constants
-	dir_DI = directory + r'\DirtyIceOptConst.dat' 
+	dir_DI = directory + r'\DirtyIceOptConst.dat'
 	
 #AstroSil Optical Constants
 dir_AS = directory+ r'\AstroSilOptConst.dat'
@@ -89,10 +95,12 @@ def trimmer(LIST, mini, maxi):
 	return tempList
 #End trimming function
 #-------------------------------------------------------------
-#Short function to write to a file data from a dictionary
+#Short function to write to a file data from a dictionary.
+#Writes to a csv file the keys as a header followed by the values
+#associated with each.
 #Python doesn't care if we want the string read-in as a raw string
 #if it sees a \' at the end of a string it complains about end-of-line errors!
-def writer(DICT, FILENAME):
+def writerD(DICT, FILENAME):
 	tempFile = open(directory + '\\' + FILENAME, 'w')
 	for ele in DICT.keys():
 		if ele is not 'NAME':
@@ -105,6 +113,25 @@ def writer(DICT, FILENAME):
 				tempFile.write(str((DICT[key][row])) + ',')
 		tempFile.write('\n')
 		row += 1
+	tempFile.close()
+#End short writing function
+#--------------------------------------------------------
+#Short writing function specifically for the emissivities.
+#Writes to a csv file a header of wavelengths followed by
+#rows of emissivities with the first value in each row being
+#the associated grain radius.
+#Done as dictionaries are (seemingly) randomly ordered when it
+#comes to numerical keys
+def writerE(HEADER, ARRAYARRAY, FILENAME):
+	tempFile = open(directory + '\\' + FILENAME, 'w')
+	tempFile.write(str(None) + ',')	#Include header explaining table and content and generating parameters?
+	for ele in HEADER:
+		tempFile.write(str(ele) + ',')
+	tempFile.write('\n')
+	for ARRAY in ARRAYARRAY:
+		for ele in ARRAY:
+			tempFile.write(str(ele) + ',')
+		tempFile.write('\n')
 	tempFile.close()
 #End short writing function
 #------------------------------------------------------------
@@ -134,7 +161,7 @@ def EMT(NM, KM, NI, KI, V=.5):
 #- Writing data from tables in files to memory -
 #-----------------------------------------------
 
-print('Writing Required Files to Memory...')
+print('Writing required files to memory...')
 
 if not preDMat:
 	#--------------------
@@ -222,7 +249,7 @@ AstroSil = {'Wavelength(Microns)':mList[0], 'Refractive Index':mList[3], 'Extinc
 #Some of the values in the list now incremented by 1 show floating point arithmetic relics
 #I'm pretty confident that's just a visual problem
 for i, ele in enumerate(AstroSil['Refractive Index']):
-		AstroSil['Refractive Index'][i] = ele + 1.0
+	AstroSil['Refractive Index'][i] = ele + 1.0
 
 AS_Tab.close()
 
@@ -267,7 +294,7 @@ del(G_Tab, mList, dir_G)
 #As this is needed for interpolation it must be done before the interpolation
 #but assignment to other dictionaries must be done after.
 
-print('Trimming Wave List...')
+print('Trimming Wave list...')
 
 if not preDMat:
 	Waves.update({'Wavelength(Microns)':trimmer(Waves['Wavelength(Microns)'], min(Water['Wavelength(Microns)']), max(Water['Wavelength(Microns)']))})
@@ -283,7 +310,7 @@ else:
 #I change these into complex numbers piecewise during EMT, I still can't figure
 #out why
 
-print('Interpolating for Missing Values and Updating the Appropriate Dictionaries...')
+print('Interpolating for missing values and updating the appropriate dictionaries...')
 
 if not preDMat:
 	#Update Amorphous Carbon Dict with interpolates for reals
@@ -316,23 +343,23 @@ AstroSil.update({'Extinction Coefficient':imaginator(list(interp(Waves['Waveleng
 #- Trimming Wave lists for useful Wavelengths; the sequel - 
 #----------------------------------------------------------
 
-print('Doin\' some more Trimming...')
+print('Doin\' some more trimming...')
 
 if not preDMat:
-	#New Wavelength(Microns)elengths for Amorphous Carbon
+	#New Wavelenghts for Amorphous Carbon
 	AmorphCarb.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 
-	#New Wavelength(Microns)elengths for Water
+	#New Wavelenghts for Water
 	Water.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 	
-	#New Wavelength(Microns)elengths for the intermediary matrix
+	#New Wavelenghts for the intermediary matrix
 	IMM.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 
 else:
-	#New Wavelength(Microns)elengths for DirtyIce
+	#New Wavelenghts for DirtyIce
 	DirtyIce.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 	
-#New Wavelength(Microns)elengths for AstroSil
+#New Wavelenghts for AstroSil
 AstroSil.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 
 #--------------------------------------------------------------
@@ -341,7 +368,7 @@ AstroSil.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 #Finally doing part of what this program is named after! Yay!
 #Initialize the Optical Constants dictionary
 
-print('Implimenting EMT to Compute Optical Constants...')
+print('Implimenting EMT to compute Optical Constants...')
 
 IMPOptConst = {'Wavelength(Microns)':Waves['Wavelength(Microns)'], 'Refractive Index':[], 'Extinction Coefficient':[], 'NAME':'Inclusion Matrix Particles'}
 
@@ -357,7 +384,7 @@ if not preDMat:
 		#Append the appropriate values to the IMM dictionary
 		IMM['Refractive Index'].append(RI)
 		if EC < 0:
-			EC = 1e-11
+			EC = 1.0e-11
 		IMM['Extinction Coefficient'].append(EC)
 
 		#Utilize the results from the last utilization of EMT for this run of EMT
@@ -379,32 +406,33 @@ else:
 		#Append the appropriate values to the IMP dictionary
 		IMPOptConst['Refractive Index'].append(RI)
 		if EC < 0:
-			EC = 1e-11
+			EC = 1.0e-11
 		IMPOptConst['Extinction Coefficient'].append(EC) 
 
 del(i, ele, RI, EC)
 
 if WRITE:
 
-	print('Writing Data to Disk...')
-
 	if WRITE_INT:
+		print('Writing Interpolate Data to disk...')
 		if not preDMat:
-			writer(AmorphCarb, 'AmorphCarbInterp2.csv')
-			writer(Water, 'WaterInterp2.csv')	
+			writerD(AmorphCarb, 'AmorphCarbInterp2.csv')
+			writerD(Water, 'WaterInterp2.csv')	
 		else:
-			writer(DirtyIce, 'DirtyIceInterp2.csv')
-			writer(AstroSil, 'AstroSilInterp2.csv')
+			writerD(DirtyIce, 'DirtyIceInterp2.csv')
+			writerD(AstroSil, 'AstroSilInterp2.csv')
 	if WRITE_EMT:
-		writer(IMPOptConst, 'IMPOptConst2.csv')
+		print('Writing EMT Data to disk...')
+		writerD(IMPOptConst, 'IMPOptConst2.csv')
 	
 if GRAPH:
+	import matplotlib.pyplot as plt
 #------------------------------------------------
 #- Modify complex coefficients to be real again -
 #------------------------------------------------
 #Must be done else MatPlotLib complains when attempting to plot the values
 
-	print('De-imaginating some Values for Graphing Purposes...')
+	print('De-imaginating some values for graphing purposes...')
 
 	if not preDMat:
 		imaginator(AmorphCarb['Extinction Coefficient'], True)
@@ -418,34 +446,42 @@ if GRAPH:
 #--------------------------------------------------
 #- Plot appropriate values if designated to do so -
 #--------------------------------------------------
-	import matplotlib.pyplot as plt
-	def flot(*flargs):
+	if GRAPH_EMT:
+		def flotEMT(*flargs):
+			plt.xlabel('Wavelength(Microns)')
+			plt.ylabel('Exitinction Coefficient')
+			plt.title('Extinction Coefficient Vs. Wavelength')
+			plt.xscale('log')
+			plt.yscale('log')
+			plt.grid(True)
+			for Exti in flargs:
+				plt.plot(Exti['Wavelength(Microns)'], Exti['Extinction Coefficient'], label = Exti['NAME'])
+			plt.legend()
+			plt.show()
+			
+			plt.xlabel('Wavelength(Microns)')
+			plt.ylabel('Refractive Index')
+			plt.title('Refractive Index Vs. Wavelength')
+			plt.xscale('log')
+			plt.grid(True)
+			for Refracti in flargs:
+				plt.plot(Refracti['Wavelength(Microns)'], Refracti['Refractive Index'], label = Refracti['NAME'])
+			plt.legend(loc = 2)
+			plt.show()
+
+		if not preDMat:		  
+			flotEMT(Water, AmorphCarb, IMM, AstroSil, IMPOptConst)
+		else:
+			flotEMT(DirtyIce, AstroSil, IMPOptConst)
+	'''if GRAPH_MIE:
+		def flotMIE(*flargs):
 		plt.xlabel('Wavelength(Microns)')
-		plt.ylabel('Exitinction Coefficient')
-		plt.title('Extinction Coefficient Vs. Wavelength')
+		plt.ylabel('Emissivity')
+		plt.title('Emissivity Vs. Wavelength')
 		plt.xscale('log')
 		plt.yscale('log')
 		plt.grid(True)
-		for Exti in flargs:
-			plt.plot(Exti['Wavelength(Microns)'], Exti['Extinction Coefficient'], label = Exti['NAME'])
-		plt.legend()
-		plt.show()
-		
-		plt.xlabel('Wavelength(Microns)')
-		plt.ylabel('Refractive Index')
-		plt.title('Refractive Index Vs. Wavelength')
-		plt.xscale('log')
-		plt.grid(True)
-		for Refracti in flargs:
-			plt.plot(Refracti['Wavelength(Microns)'], Refracti['Refractive Index'], label = Refracti['NAME'])
-		plt.legend(loc = 2)
-		plt.show()
-
-	if not preDMat:		  
-		flot(Water, AmorphCarb, IMM, AstroSil, IMPOptConst)
-	else:
-		flot(DirtyIce, AstroSil, IMPOptConst) 
-
+'''
 if RUNMIE:
 #--------------
 #- MIE Theory -
@@ -462,7 +498,7 @@ if RUNMIE:
 #Seems to give me something new everytime its run without changing anything!
 #Delete old dictionaries to free up memory for the Emiss array
 
-	print('Utilizing MIE Theory to Calculate Emissivity of the IMPs; This can take some time...')
+	print('Utilizing MIE Theory to calculate Emissivity of the IMPs.\nDepending on the number of Wavelengths and Grain Sizes,\nthis can take qite a bit of time... [>1hr]')
 
 	if not preDMat:
 		del(AmorphCarb, Water, IMM)
@@ -471,10 +507,13 @@ if RUNMIE:
 	del(AstroSil)
 	
 	from bhmie_herbert_kaiser_july2012_GEOFF_EDITION import bhmie
-	Emiss = {}
-	for radius in Waves['SIZE']:
-		print('Emissivites for grains of radius: ' + str(radius) + ' microns')
-		Emiss.update({radius:[]})
+	Emiss = []
+	Time0 = times()[0]
+	sizey = len(Waves['SIZE'])
+	for iter, radius in enumerate(Waves['SIZE']):
+		print('Emissivites for grains of radius: ' + str(radius) + ' microns. ' + str(iter) + ' of ' + str(sizey) + '.\nTime for last radius: ' + str(times()[0] - Time0) + ' seconds')
+		Time0 = times()[0]
+		Emiss.append([radius])
 		for i, lamda in enumerate(Waves['Wavelength(Microns)']):
 			RI = IMPOptConst['Refractive Index'][i]
 			if type(IMPOptConst['Extinction Coefficient'][i]) is not type(1j):
@@ -484,9 +523,10 @@ if RUNMIE:
 			qabs = bhmie((2*pi*radius)/lamda, RI + EC, 2)
 			if (qabs <= 0):
 				qabs = 1.0e-11
-			Emiss[radius].append(qabs)
-			#print(radius, lamda, Refractive Index, Extinction Coefficient, i, len(Emiss), len(Emiss[radius]))
+			Emiss[iter].append(qabs)
+
 if WRITE and WRITE_MIE:
-	writer(Emiss, 'Emissivities.csv')
-print('Run Time: ' + str(times()[0] - TIME1))
+	print('Writing MIE Data to disk...')
+	writerE(Waves['Wavelength(Microns)'], Emiss, 'Emissivities.csv')
+print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
 raw_input('Press ENTER to exit')
