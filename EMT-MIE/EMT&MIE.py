@@ -5,6 +5,7 @@
 	Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
 	
 	TODO:
+		-Revert to declaring appropriate values imaginary in the EMT function to degenerate imaginator function
 		-Change to usage of numpy readers(?)
 		-Generalize variable names to accomodate other substances?
 		-Make stylistic changes as per suggestion
