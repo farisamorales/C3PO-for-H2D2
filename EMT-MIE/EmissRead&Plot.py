@@ -3,18 +3,26 @@ import matplotlib.pyplot as plt
 from math import log10
 
 DEFAULTDIR = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect\testfiles\\'
-
+print('Current default directory: ' + DEFAULTDIR)
 directory = raw_input('Please enter file directory: ')
 
-fileName = raw_input('Please enter FULL file name: ')
+fileName = raw_input('Please enter the designator (e.x. DI;AS;50-50); type HELP for help: ')
 
 if directory == '':
 	directory = DEFAULTDIR
 
-if fileName == '':
-	exit()
+if fileName.lower() == 'help':
+	print('Designators take the form MATRIX;INCLUSION;VOL_MATRIX-VOL_INCLUSION\nWhere MATRIX or INCLUSION is the two letter symbol for\nthe matrix/inclusion substance (e.x. DI for DirtyIce)\nVOL_MATRIX is a number between 0 and 100\nAndVOL_INCLUSION is 100 - VOL_MATRIX')
+	fileName = raw_input('Please enter the designator; type HELP for more help: ')
+	if fileName.lower() == 'help':
+		print('Current substances and there associated symbols:\n\tDirtyIce - DI\n\tWaterIce - WA\n\tAmorphousCarbon - AC\n\tAstroSil - AS')
+		fileName = raw_input('Please enter the designator; don\'t type HELP for even more help: ')
+		if fileName.lower() == 'help':
+			print('Excuse me, What did I just tell you about asking for more help?')
+			raw_input('I\'m done. Press any key to exit')
+			exit()
 
-ffile = open(directory + fileName, 'rb')
+ffile = open(directory + 'Emissivities[' + fileName + '].csv', 'rb')
 
 def readEmiss(FILE):
 	FILE.seek(0)
