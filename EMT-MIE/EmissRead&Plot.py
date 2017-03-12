@@ -21,8 +21,7 @@ def readEmiss(FILE):
 	Lamda = listifier(whiteSpaceParser(FILE.readline()))
 	Emiss = []
 	for ele in FILE:
-		temp = listifier(whiteSpaceParser(ele))
-		Emiss.append(temp)
+		Emiss.append(listifier(whiteSpaceParser(ele)))
 	return Lamda, Emiss
 
 Lamda, Emiss = readEmiss(ffile)
