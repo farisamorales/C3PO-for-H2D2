@@ -4,4 +4,21 @@ The top most row is the wavelengths (in microns).
 The left most column is the grain radius (in microns).
 
 To read-in these tables use the following:
-TBD
+--------------------------------------------------
+def readEmiss(FILE):
+	from kmod import listifier, whiteSpaceParser
+	FILE.seek(0)
+	Wavelengths = listifier(whiteSpaceParser(FILE.readline()))
+	GrainRadii, Emissivities = [], []
+	for ele in FILE:
+		temp = listifier(whiteSpaceParser(ele))
+		Emissivities.append(temp[1:])
+		GrainRadii.append(temp[0])
+	return Wavelengths, GrainRadii, Emissivities
+--------------------------------------------------
+Wavelengths is a list of the wavelengths
+GrainRadii is a list of the grain radii
+Emissivities is a list of lists consisting of the emissivities; the interior lists are by wavelength; the exterior list by grain radii
+For example, suppose the grain radius of 1.0 is associated with the index 78 and the wavelength of 31.4 with the index 90, then to
+get the emissivity for that grainsize for light of that wavelength you would call Emissivities[78][90].
+The interior and exterior indicies for a given grain radii and light wavelength are identical to those is there own lists.
