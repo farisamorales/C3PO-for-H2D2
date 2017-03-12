@@ -6,19 +6,16 @@ The left most column is the grain radius (in microns).
 To read-in these tables use the following:
 --------------------------------------------------
 def readEmiss(FILE):
-	from kmod import listifier, whiteSpaceParser
 	FILE.seek(0)
-	Wavelengths = listifier(whiteSpaceParser(FILE.readline()))
-	GrainRadii, Emissivities = [], []
+	Lamda = listifier(whiteSpaceParser(FILE.readline()))
+	Emiss = []
 	for ele in FILE:
 		temp = listifier(whiteSpaceParser(ele))
-		Emissivities.append(temp[1:])
-		GrainRadii.append(temp[0])
-	return Wavelengths, GrainRadii, Emissivities
+		Emiss.append(temp)
+	return Lamda, Emiss
 --------------------------------------------------
 Wavelengths is a list of the wavelengths
-GrainRadii is a list of the grain radii
 Emissivities is a list of lists consisting of the emissivities; the interior lists are by wavelength; the exterior list by grain radii
-For example, suppose the grain radius of 1.0 is associated with the index 78 and the wavelength of 31.4 with the index 90, then to
-get the emissivity for that grainsize for light of that wavelength you would call Emissivities[78][90].
-The interior and exterior indicies for a given grain radii and light wavelength are identical to those is there own lists.
+The first element in the interior list (index 0) is the grain radius associated with those emissivities.
+The index position of the emissivities in the interior lists associated with a wavelength in the wavelength list of index n is n+1;
+That is, if 1.0 micron has the index 7, then in the interior lists, the emissivities associated with 1.0 micron have index 8
