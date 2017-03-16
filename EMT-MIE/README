@@ -1,4 +1,3 @@
 READ THIS README
 
-The EMT&MIE.py and some associated thingers require modules from kmod.py to be imported; from the C3PO-for-H2D2 main folder you can
-find kmod.py; put that in the lib folder of your python distribution for these importations to work (JUSTIN THIS PERTAINS TO YOU)
+The EMT&MIE.py and some associated thingers require modules from kmod.py to be imported; from the C3PO-for-H2D2 main folder you can find kmod.py; put that in the lib folder of your python distribution for these importations to work (JUSTIN THIS PERTAINS TO YOU)
