@@ -5,7 +5,7 @@
 	Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
 	
 	TODO:
-		-Revert to declaring appropriate values imaginary in the EMT function to degenerate imaginator function
+		-Remove superfluous code
 		-Change to usage of numpy readers(?)
 		-Generalize variable names to accomodate other substances?
 		-Make stylistic changes as per suggestion
@@ -33,14 +33,14 @@ preDMat = True
 
 #For whether or not we will be running MIE theory on the optical constants calculated
 #here. The value of this constant should be self-explanitory to what it means.
-RUNMIE = True
+RUNMIE = False
 
 #For whether or not we will be writing new lists to memory. If true, checks if we want to
 #write the results of interpolations, EMT, and if running MIE, the results of MIE theory
-WRITE = True
+WRITE = False
 if WRITE:
 	WRITE_INT = False
-	WRITE_EMT = False
+	WRITE_EMT = True
 	if RUNMIE:
 		WRITE_MIE = True
 
@@ -48,7 +48,7 @@ if WRITE:
 #EMT, and if running MIE, the results of MIE theory.
 GRAPH = True
 if GRAPH:
-	GRAPH_EMT = False
+	GRAPH_EMT = True
 	if RUNMIE:
 		GRAPH_MIE = True
 	import matplotlib.pyplot as plt
@@ -145,24 +145,13 @@ def writerE(HEADER, ARRAYARRAY, FILENAME):
 		tempFile.write('\n')
 	tempFile.close()
 #End short writing function
-#------------------------------------------------------------
-#Short function to change values in a list to complex numbers
-def imaginator(LIST, demaginate=False):
-	if demaginate:
-		for i, ele in enumerate(LIST):
-			LIST[i] = float(imag(ele))
-	else:
-		for i, ele in enumerate(LIST):
-			LIST[i] = 1j * ele
-	return LIST
-#No, it wasn't necessary to write a function for this too but I'm doing it anyway
 #------------------------------------------------------------------------------------------
 #Short function to calculate the average optical constants based on Effective Medium Theory
 #NM: Refractive Index of Matrix, KM: Extinction Coefficient of Matrix
 #NI: Refractive Index of Inclusion, KI: Extinction Coefficient of Inclusion
 #V: Ratio of pollutant volume to total volume
 def EMT(NM, KM, NI, KI, V=.5):
-	M, I = (NM + KM) ** 2, (NI + KI) ** 2
+	M, I = (NM + KM*1j) ** 2, (NI + KI*1j) ** 2
 	F = (I - M) / (I + 2.0 * M)
 	AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
 	return float(real(AMOC)), float(imag(AMOC))
@@ -218,7 +207,7 @@ if not preDMat:
 	#- Itermediary Matrix -
 	#----------------------
 	#For graphing purposes
-	IMM = {'Wavelength(Microns)':[], 'Refractive Index':[], 'Extinction Coefficient':[], 'NAME':'IMM'}
+	IntermediaryMatrix = {'Wavelength(Microns)':[], 'Refractive Index':[], 'Extinction Coefficient':[], 'NAME':'Intermediary Matrix'}
 	
 	
 else:
@@ -328,27 +317,27 @@ if not preDMat:
 	AmorphCarb.update({'Refractive Index':list(interp(Waves['Wavelength(Microns)'], AmorphCarb['Wavelength(Microns)'], AmorphCarb['Refractive Index']))})
 
 	#Update Amorphous Carbon Dict with interpolates for complex
-	AmorphCarb.update({'Extinction Coefficient':imaginator(list(interp(Waves['Wavelength(Microns)'], AmorphCarb['Wavelength(Microns)'], AmorphCarb['Extinction Coefficient'])))})
+	AmorphCarb.update({'Extinction Coefficient':list(interp(Waves['Wavelength(Microns)'], AmorphCarb['Wavelength(Microns)'], AmorphCarb['Extinction Coefficient']))})
 
 	#Update Water Dict with interpolates for reals
 	Water.update({'Refractive Index':list(interp(Waves['Wavelength(Microns)'], Water['Wavelength(Microns)'], Water['Refractive Index']))})
 
 	#Update Water Dict with interpolates for complex
-	Water.update({'Extinction Coefficient':imaginator(list(interp(Waves['Wavelength(Microns)'], Water['Wavelength(Microns)'], Water['Extinction Coefficient'])))})
+	Water.update({'Extinction Coefficient':list(interp(Waves['Wavelength(Microns)'], Water['Wavelength(Microns)'], Water['Extinction Coefficient']))})
 
 else:
 	#Update DirtyIce Dict with interpolates for reals
 	DirtyIce.update({'Refractive Index':list(interp(Waves['Wavelength(Microns)'], DirtyIce['Wavelength(Microns)'], DirtyIce['Refractive Index']))})
 
 	#Update DirtyIce Dict with interpolates for complex
-	DirtyIce.update({'Extinction Coefficient':imaginator(list(interp(Waves['Wavelength(Microns)'], DirtyIce['Wavelength(Microns)'], DirtyIce['Extinction Coefficient'])))})
+	DirtyIce.update({'Extinction Coefficient':list(interp(Waves['Wavelength(Microns)'], DirtyIce['Wavelength(Microns)'], DirtyIce['Extinction Coefficient']))})
 
 
 #Update AstroSil Dict with interpolates for reals
 AstroSil.update({'Refractive Index':list(interp(Waves['Wavelength(Microns)'], AstroSil['Wavelength(Microns)'], AstroSil['Refractive Index']))})
 
 #Update AstroSil Dict with interpolates for complex
-AstroSil.update({'Extinction Coefficient':imaginator(list(interp(Waves['Wavelength(Microns)'], AstroSil['Wavelength(Microns)'], AstroSil['Extinction Coefficient'])))})
+AstroSil.update({'Extinction Coefficient':list(interp(Waves['Wavelength(Microns)'], AstroSil['Wavelength(Microns)'], AstroSil['Extinction Coefficient']))})
 
 #----------------------------------------------------------
 #- Trimming Wave lists for useful Wavelengths; the sequel - 
@@ -364,7 +353,7 @@ if not preDMat:
 	Water.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 	
 	#New Wavelenghts for the intermediary matrix
-	IMM.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
+	IntermediaryMatrix.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 
 else:
 	#New Wavelenghts for DirtyIce
@@ -392,15 +381,15 @@ if not preDMat:
 		#Utilize EMT for Amorphous Carbon and Water
 		RI, EC = EMT(ele, Water['Extinction Coefficient'][i], AmorphCarb['Refractive Index'][i], AmorphCarb['Extinction Coefficient'][i])
 
-		#Append the appropriate values to the IMM dictionary
-		IMM['Refractive Index'].append(RI)
+		#Append the appropriate values to the Intermediary Matrix dictionary
+		IntermediaryMatrix['Refractive Index'].append(RI)
 		if EC < 0:
 			EC = 1.0e-11
-		IMM['Extinction Coefficient'].append(EC)
+		IntermediaryMatrix['Extinction Coefficient'].append(EC)
 
 		#Utilize the results from the last utilization of EMT for this run of EMT
 		#now with AstroSil
-		RI, EC = EMT(IMM['Refractive Index'][i], IMM['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
+		RI, EC = EMT(IntermediaryMatrix['Refractive Index'][i], IntermediaryMatrix['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
 	
 		#Append the appropriate values to the IMP dictionary
 		IMPOptConst['Refractive Index'].append(RI)
@@ -423,7 +412,6 @@ else:
 del(i, ele, RI, EC)
 
 if WRITE:
-
 	if WRITE_INT:
 		print('Writing Interpolate Data to disk...')
 		if not preDMat:
@@ -437,22 +425,6 @@ if WRITE:
 		writerD(IMPOptConst, 'IMPOptConst2.csv')
 	
 if GRAPH and GRAPH_EMT:
-#------------------------------------------------
-#- Modify complex coefficients to be real again -
-#------------------------------------------------
-#Must be done else MatPlotLib complains when attempting to plot the values
-
-	print('De-imaginating some values for graphing purposes...')
-
-	if not preDMat:
-		imaginator(AmorphCarb['Extinction Coefficient'], True)
-		imaginator(Water['Extinction Coefficient'], True)
-
-	else:
-		imaginator(DirtyIce['Extinction Coefficient'], True)
-	
-	imaginator(AstroSil['Extinction Coefficient'], True)
-	
 #--------------------------------------------------
 #- Plot appropriate values if designated to do so -
 #--------------------------------------------------
@@ -465,7 +437,7 @@ if GRAPH and GRAPH_EMT:
 		plt.grid(True)
 		for Exti in flargs:
 			plt.plot(Exti['Wavelength(Microns)'], Exti['Extinction Coefficient'], label = Exti['NAME'])
-		plt.legend()
+		plt.legend(loc = 0)
 		plt.show()
 		
 		plt.xlabel('Wavelength(Microns)')
@@ -475,11 +447,11 @@ if GRAPH and GRAPH_EMT:
 		plt.grid(True)
 		for Refracti in flargs:
 			plt.plot(Refracti['Wavelength(Microns)'], Refracti['Refractive Index'], label = Refracti['NAME'])
-		plt.legend(loc = 2)
+		plt.legend(loc = 0)
 		plt.show()
 
 	if not preDMat:		  
-		flotEMT(Water, AmorphCarb, IMM, AstroSil, IMPOptConst)
+		flotEMT(Water, AmorphCarb, IntermediaryMatrix, AstroSil, IMPOptConst)
 	else:
 		flotEMT(DirtyIce, AstroSil, IMPOptConst)
 
@@ -502,7 +474,7 @@ if RUNMIE:
 	print('Utilizing MIE Theory to calculate Emissivity of the IMPs.\nDepending on the number of Wavelengths and Grain Sizes,\nthis can take qite a bit of time... [>1hr]')
 
 	if not preDMat:
-		del(AmorphCarb, Water, IMM)
+		del(AmorphCarb, Water, IntermediaryMatrix)
 	else:
 		del(DirtyIce)
 	del(AstroSil)
@@ -526,25 +498,27 @@ if RUNMIE:
 				qabs = 1.0e-11
 			Emiss[iter].append(qabs)
 
-if WRITE and WRITE_MIE:
-	print('Writing MIE Data to disk...')
-	writerE(Waves['Wavelength(Microns)'], Emiss, 'Emissivities.csv')
+if WRITE and RUNMIE:
+	if WRITE_MIE:
+		print('Writing MIE Data to disk...')
+		writerE(Waves['Wavelength(Microns)'], Emiss, 'Emissivities.csv')
 
-if GRAPH and GRAPH_MIE:
-	def flotMIE(EMISS):
-		plt.xlabel('Wavelength(Microns)')
-		plt.ylabel('Emissivity')
-		plt.title('Emissivity Vs. Wavelength')
-		plt.xscale('log')
-		plt.yscale('log')
-		plt.grid(True)
-		for ARRAY in EMISS:
-			if (log10(ARRAY[0]) == int(log10(ARRAY[0]))):
-				plt.plot(Waves['Wavelength(Microns)'], ARRAY[1:], label = ARRAY[0])
-		plt.legend(loc = 0)
-		plt.show()
+if GRAPH and RUNMIE:
+	if GRAPH_MIE:
+		def flotMIE(EMISS):
+			plt.xlabel('Wavelength(Microns)')
+			plt.ylabel('Emissivity')
+			plt.title('Emissivity Vs. Wavelength')
+			plt.xscale('log')
+			plt.yscale('log')
+			plt.grid(True)
+			for ARRAY in EMISS:
+				if (log10(ARRAY[0]) == int(log10(ARRAY[0]))):
+					plt.plot(Waves['Wavelength(Microns)'], ARRAY[1:], label = ARRAY[0])
+			plt.legend(loc = 0)
+			plt.show()
 
-	flotMIE(Emiss)
+		flotMIE(Emiss)
 
 print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
 raw_input('Press ENTER to exit')
