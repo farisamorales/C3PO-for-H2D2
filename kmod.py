@@ -8,7 +8,8 @@
 	string where a whitespace had been separating elements in that string.
 	
 	Author: Cody "This is the third time I've changed what it does" King
-	LastUpdated: October 31, 2016
+	LastUpdated: March 11, 2017
+		-Added commas as thing to replace
 	Python Version: 2.7.12
 '''
 #--------------------------------------------------------------------------------------------------	
@@ -24,10 +25,11 @@ def whiteSpaceParser(master):
 	if not master.startswith(' '):
 		master = ' ' + master
 
-	#Deletes all tabs, newlines, and carriage returns (\r) replacing them with whitespaces
+	#Deletes all tabs, newlines, carriage returns (\r), and commas replacing them with whitespaces
 	master=master.replace('\t',' ')
 	master=master.replace('\n',' ')
 	master=master.replace('\r',' ')
+	master=master.replace(',',' ')
 
 	#Deletes any redundant whitespaces by replacing all double whitespace with a single one
 	#loops through master until all of them are gone
@@ -176,12 +178,12 @@ def getStart(tFile):
 			#If not we start over from the next line
 			except ValueError:
 				if first:
-					first, second = False, False
+					first, second=False, False
 				break
 			if first:
-				second = True
+				second=True
 			else:
-				first = True
+				first=True
 		continue
 	#If we've made it out of the loop then we've found the starting position (probably)
 	del(tFile, first, second, i)
@@ -197,4 +199,4 @@ def getCol(tFile):
 	toTest = whiteSpaceParser(tFile.readline())
 	del(tFile)
 	return len(toTest[1]) - 1
-#--------------------------------------------------------------------------------------------------	
+#--------------------------------------------------------------------------------------------------    
