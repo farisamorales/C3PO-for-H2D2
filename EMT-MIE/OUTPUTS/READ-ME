@@ -5,6 +5,7 @@ The left most column is the grain radius (in microns).
 
 To read-in these tables use the following:
 --------------------------------------------------
+from kmod import listifier, whiteSpaceParser
 def readEmiss(FILE):
 	FILE.seek(0)
 	Lamda = listifier(whiteSpaceParser(FILE.readline()))
