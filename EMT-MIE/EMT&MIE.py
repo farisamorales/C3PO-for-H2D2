@@ -5,52 +5,100 @@
 	Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
 	
 	TODO:
+		-Impliment logic flow for choice of materials and such
 		-Remove superfluous code
 		-Change to usage of numpy readers(?)
 		-Generalize variable names to accomodate other substances?
 		-Make stylistic changes as per suggestion
+		-Add error handling where errors would be common (e.g. file openers)
 '''
 
-from numpy import interp, real, imag, pi
+try:
+	from numpy import interp, real, imag, pi
 #interp(x-coord of desired interpolates, x-coord of input data, y-coord of input data)
 #Returns a numpy array object; this can be quickly converted to a standard python list
 #I don't know if it's necessary (probably not) but I do it anyway just in case
-from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
-from cmath import sqrt
-from math import log10
-from os import times
+	from kmod import whiteSpaceParser, getStart, getCol, listifier, columnizer
+	from cmath import sqrt
+	from math import log10
+except ImportError:
+	print('One or more required modules could not be found; check the python distribution library.')
+	raw_input('Press ENTER to exit')
+	exit()
 
-TIME1 = times()[0]
+timey = True
+try:
+	from os import times
+except ImportError:
+	timey = False
+
+if timey: TIME1 = times()[0]
 
 print('Initializing...')
+
+#Thinking of adding a default variable loader
+DEFAULTDIR = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
+
+#-----------------------------------------------------------
+#Tiny simplifying function that needs to be declared earlier
+def logicFlow (Q):
+	resp = raw_input(Q)
+	if resp == '1':
+		return True
+	elif resp == '2':
+		return False
+	else:
+		print(resp + ' is not valid input.')
+		return None
+#-----------------------------------------------------------
 
 #--------------------
 #- Global Variables -
 #--------------------
 #For whether or not we will be making our own polluted matrix prior to re-inclusion; 
 #if true we do not make our own
-preDMat = True
+preDMat = None
+while preDMat == None:
+	preDMat = logicFlow(r'Use a predetermined matrix composition? 1)Yes 2)No: ')
 
 #For whether or not we will be running MIE theory on the optical constants calculated
 #here. The value of this constant should be self-explanitory to what it means.
-RUNMIE = False
+RUNMIE = None
+while RUNMIE == None:
+	RUNMIE = logicFlow(r'Run Mie Theory? 1)Yes 2)No: ')
 
 #For whether or not we will be writing new lists to memory. If true, checks if we want to
 #write the results of interpolations, EMT, and if running MIE, the results of MIE theory
-WRITE = False
+WRITE = None
+while WRITE == None:
+	WRITE = logicFlow(r'Write results to disk? 1)Yes 2)No: ')
+
 if WRITE:
-	WRITE_INT = False
-	WRITE_EMT = True
+	WRITE_INT = None
+	while WRITE_INT == None:
+		WRITE_INT = logicFlow(r'Write results of interpolates to disk? 1)Yes 2)No: ')
+	WRITE_EMT = None
+	while WRITE_EMT == None:
+		WRITE_EMT = logicFlow(r'Write results of EMT to disk? 1)Yes 2)No: ')
 	if RUNMIE:
-		WRITE_MIE = True
+		WRITE_MIE = None
+		while WRITE_MIE == None:
+			WRITE_MIE = logicFlow(r'Write results of MIE Theory to disk? 1)Yes 2)No: ')
 
 #For whether or not we will be generating graphs of the results of the intpolations,
 #EMT, and if running MIE, the results of MIE theory.
-GRAPH = True
+GRAPH = None
+while GRAPH == None:
+	GRAPH = logicFlow(r'Graph results? 1)Yes 2)No: ')
+
 if GRAPH:
-	GRAPH_EMT = True
+	GRAPH_EMT = None
+	while GRAPH_EMT == None:
+		GRAPH_EMT = logicFlow(r'Graph results of EMT? 1)Yes 2)No: ')
 	if RUNMIE:
-		GRAPH_MIE = True
+		GRAPH_MIE = None
+		while GRAPH_MIE == None:
+			GRAPH_MIE = logicFlow(r'Graph results of MIE Theory? 1)Yes 2)No: ')
 	import matplotlib.pyplot as plt
 
 print('Orbital Variables:\n\tpreDMat-' + str(preDMat) + '\n\tRUNMIE-' + str(RUNMIE) + '\n\tWRITE-' + str(WRITE) + '\n\tGRAPH-' + str(GRAPH) + '\nSuborbital Variables:')
@@ -68,7 +116,9 @@ if GRAPH:
 #---------------------------------------------
 
 #File directory for written tables
-directory = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
+directory = raw_input(r'Please specifiy the file directory (Press ENTER for default): ')
+if directory == '':
+	directory = DEFAULTDIR
 
 print('File Directory:\n' + directory)
 
@@ -468,9 +518,6 @@ if RUNMIE:
 #sublist is the emissivity of the grains of the various sizes associated
 #with the Wavelength of incident light.
 
-#Seems to give me something new everytime its run without changing anything!
-#Delete old dictionaries to free up memory for the Emiss array
-
 	print('Utilizing MIE Theory to calculate Emissivity of the IMPs.\nDepending on the number of Wavelengths and Grain Sizes,\nthis can take qite a bit of time... [>1hr]')
 
 	if not preDMat:
@@ -481,11 +528,13 @@ if RUNMIE:
 	
 	from bhmie_herbert_kaiser_july2012_GEOFF_EDITION import bhmie
 	Emiss = []
-	Time0 = times()[0]
+	if timey: Time0 = times()[0]
 	sizey = len(Waves['SIZE'])
 	for iter, radius in enumerate(Waves['SIZE']):
-		print('Emissivites for grains of radius: ' + str(radius) + ' microns. ' + str(iter + 1) + ' of ' + str(sizey) + '.\nTime for last radius: ' + str(times()[0] - Time0) + ' seconds')
-		Time0 = times()[0]
+		print('Emissivites for grains of radius: ' + str(radius) + ' microns. ' + str(iter + 1) + ' of ' + str(sizey))
+		if timey:
+			print('\nTime for last radius: ' + str(times()[0] - Time0) + ' seconds')
+			Time0 = times()[0]
 		Emiss.append([radius])
 		for i, lamda in enumerate(Waves['Wavelength(Microns)']):
 			RI = IMPOptConst['Refractive Index'][i]
@@ -519,6 +568,6 @@ if GRAPH and RUNMIE:
 			plt.show()
 
 		flotMIE(Emiss)
-
-print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
+if timey:
+	print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
 raw_input('Press ENTER to exit')
