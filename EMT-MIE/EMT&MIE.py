@@ -5,7 +5,7 @@
 	Author: Dr. Farisa Morales (original IDL code) transcribed and modified by Cody King
 	
 	TODO:
-		-Impliment logic flow for choice of materials and such
+		-Continue to impliment logic flow for choice of materials and such
 		-Remove superfluous code
 		-Change to usage of numpy readers(?)
 		-Generalize variable names to accomodate other substances?
@@ -40,7 +40,7 @@ print('Initializing...')
 DEFAULTDIR = r'C:\Users\Cody\Desktop\School Documents\Physics\Independent Study\DielectricEffect'
 
 #-----------------------------------------------------------
-#Tiny simplifying function that needs to be declared earlier
+#Tiny simplifying functions that need to be declared earlier
 def logicFlow (Q):
 	resp = raw_input(Q)
 	if resp == '1':
@@ -206,6 +206,37 @@ def EMT(NM, KM, NI, KI, V=.5):
 	AMOC = sqrt(M * (1 + ((3.0 * V * F) / (1 - V * F))))
 	return float(real(AMOC)), float(imag(AMOC))
 #End REALLY short EMT function
+#-------------------------------------------------------------
+#Short function to utilize the above EMT function in recursion
+#Argument is a list of tuples, each tuple comprised of the dictionary of the matrix
+#material, the dictionary of the inclusion material, and then the decimal volume
+#fraction of the matrix to total volume. Keyword arguments are: 'recur' and 'vacuum'.
+#'recur' can take the place of the matrix or inclusion except on the first iteration;
+#'vacuum' can only take the place of the inclusion.
+def EMTRecursion(*mivargs):
+	lastIter, iteration = {'Refractive Index':[], 'Extinction Coefficient':[]}, 0
+	for miv in mivargs:
+		m, i, v = miv
+		if m == 'vacuum' or (iteration == 0 and (m == 'recur' or i == 'recur')) or v >= 1 or v <= 0:
+			print('An error has occured; vacuum has been designated as the matrix material or\na recur was encountered on the first iteration\nIteration: ' + str(iteration) + ' or an invalid ratio was encountered')
+			return None
+		if m == 'recur':
+			m = {'Refractive Index':[], 'Extinction Coefficient':[]}
+			m.update(lastIter)
+		if i == 'recur':
+			i = {'Refractive Index':[], 'Extinction Coefficient':[]}
+			i.update(lastIter)
+		lastIter.update({'Refractive Index':[], 'Extinction Coefficient':[]})
+		for it, mRI in enumerate(m['Refractive Index']):
+			if i == 'vacuum':
+				RI, EC = EMT(mRI, m['Extinction Coefficient'][it], 1, 0, v)
+			else:
+				RI, EC = EMT(mRI, m['Extinction Coefficient'][it], i['Refractive Index'][it], i['Extinction Coefficient'][it], v)
+			lastIter['Refractive Index'].append(RI)
+			lastIter['Extinction Coefficient'].append(EC)
+		iteration += 1
+	return lastIter
+#End short recursion function
 
 #-----------------------------------------------
 #- Writing data from tables in files to memory -
@@ -251,14 +282,7 @@ if not preDMat:
 
 	WA_Tab.close()
 
-	del(WA_Tab, mList, dir_WA)
-
-	#----------------------
-	#- Itermediary Matrix -
-	#----------------------
-	#For graphing purposes
-	IntermediaryMatrix = {'Wavelength(Microns)':[], 'Refractive Index':[], 'Extinction Coefficient':[], 'NAME':'Intermediary Matrix'}
-	
+	del(WA_Tab, mList, dir_WA)	
 	
 else:
 	#-------------
@@ -401,9 +425,6 @@ if not preDMat:
 
 	#New Wavelenghts for Water
 	Water.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
-	
-	#New Wavelenghts for the intermediary matrix
-	IntermediaryMatrix.update({'Wavelength(Microns)':Waves['Wavelength(Microns)']})
 
 else:
 	#New Wavelenghts for DirtyIce
@@ -426,40 +447,10 @@ IMPOptConst = {'Wavelength(Microns)':Waves['Wavelength(Microns)'], 'Refractive I
 #optical constants
 
 if not preDMat:
-	for i, ele in enumerate(Water['Refractive Index']):
-	
-		#Utilize EMT for Amorphous Carbon and Water
-		RI, EC = EMT(ele, Water['Extinction Coefficient'][i], AmorphCarb['Refractive Index'][i], AmorphCarb['Extinction Coefficient'][i])
+	IMPOptConst.update(EMTRecursion((Water, AmorphCarb, 0.5), ('recur', AstroSil, 0.5)))
 
-		#Append the appropriate values to the Intermediary Matrix dictionary
-		IntermediaryMatrix['Refractive Index'].append(RI)
-		if EC < 0:
-			EC = 1.0e-11
-		IntermediaryMatrix['Extinction Coefficient'].append(EC)
-
-		#Utilize the results from the last utilization of EMT for this run of EMT
-		#now with AstroSil
-		RI, EC = EMT(IntermediaryMatrix['Refractive Index'][i], IntermediaryMatrix['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
-	
-		#Append the appropriate values to the IMP dictionary
-		IMPOptConst['Refractive Index'].append(RI)
-		if EC < 0:
-			EC = 1.0e-11
-		IMPOptConst['Extinction Coefficient'].append(EC)
-			
 else:
-	for i, ele in enumerate(DirtyIce['Refractive Index']):
-		
-		#Utilize EMT with the Predetermined Matrix and Inclusion
-		RI, EC = EMT(ele, DirtyIce['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
-		
-		#Append the appropriate values to the IMP dictionary
-		IMPOptConst['Refractive Index'].append(RI)
-		if EC < 0:
-			EC = 1.0e-11
-		IMPOptConst['Extinction Coefficient'].append(EC) 
-
-del(i, ele, RI, EC)
+	IMPOptConst.update(EMTRecursion((DirtyIce, AstroSil, 0.5)))
 
 if WRITE:
 	if WRITE_INT:
@@ -501,7 +492,7 @@ if GRAPH and GRAPH_EMT:
 		plt.show()
 
 	if not preDMat:		  
-		flotEMT(Water, AmorphCarb, IntermediaryMatrix, AstroSil, IMPOptConst)
+		flotEMT(Water, AmorphCarb, AstroSil, IMPOptConst)
 	else:
 		flotEMT(DirtyIce, AstroSil, IMPOptConst)
 
@@ -571,3 +562,41 @@ if GRAPH and RUNMIE:
 if timey:
 	print('Run Time: ' + str(times()[0] - TIME1) + ' seconds')
 raw_input('Press ENTER to exit')
+
+'''
+if not preDMat:
+	for i, ele in enumerate(Water['Refractive Index']):
+	
+		#Utilize EMT for Amorphous Carbon and Water
+		RI, EC = EMT(ele, Water['Extinction Coefficient'][i], AmorphCarb['Refractive Index'][i], AmorphCarb['Extinction Coefficient'][i])
+
+		#Append the appropriate values to the Intermediary Matrix dictionary
+		IntermediaryMatrix['Refractive Index'].append(RI)
+		if EC < 0:
+			EC = 1.0e-11
+		IntermediaryMatrix['Extinction Coefficient'].append(EC)
+
+		#Utilize the results from the last utilization of EMT for this run of EMT
+		#now with AstroSil
+		RI, EC = EMT(IntermediaryMatrix['Refractive Index'][i], IntermediaryMatrix['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
+	
+		#Append the appropriate values to the IMP dictionary
+		IMPOptConst['Refractive Index'].append(RI)
+		if EC < 0:
+			EC = 1.0e-11
+		IMPOptConst['Extinction Coefficient'].append(EC)
+			
+else:
+	for i, ele in enumerate(DirtyIce['Refractive Index']):
+		
+		#Utilize EMT with the Predetermined Matrix and Inclusion
+		RI, EC = EMT(ele, DirtyIce['Extinction Coefficient'][i], AstroSil['Refractive Index'][i], AstroSil['Extinction Coefficient'][i])
+		
+		#Append the appropriate values to the IMP dictionary
+		IMPOptConst['Refractive Index'].append(RI)
+		if EC < 0:
+			EC = 1.0e-11
+		IMPOptConst['Extinction Coefficient'].append(EC) 
+
+del(i, ele, RI, EC)
+'''
