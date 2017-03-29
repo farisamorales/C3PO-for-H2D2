@@ -20,3 +20,7 @@ Emiss is a list of lists consisting of the emissivities; the interior lists are 
 The first element in the interior list (index 0) is the grain radius associated with those emissivities.
 The index position of the emissivities in the interior lists associated with a wavelength in the wavelength list of index n is n+1;
 That is, if 1.0 micron has the index 7, then in the interior lists, the emissivities associated with 1.0 micron have index 8
+
+
+Current naming convention is messy but follows the following format:
+MatrixMaterial;InclusionMaterial;%VolumeMatrix-%VolumeInclusion[;AdditionalInclusion;%VolumeMatrix-%VolumeInclusion]
