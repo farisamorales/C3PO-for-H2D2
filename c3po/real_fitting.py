@@ -72,13 +72,13 @@ starNames = [starNames[0]]
 if oneWander:
     IMG_DIR = RES_DIR + os.sep.join("Plots/Warm Wander/".split('/'))
     PARAMS_DIR = RES_DIR + os.sep.join("Params/Warm Wander/".split('/'))
-if twoWander:
+elif twoWander:
     IMG_DIR = RES_DIR + os.sep.join("Plots/Both Wander/".split('/'))
     PARAMS_DIR = RES_DIR + os.sep.join("Params/Both Wander/".split('/'))
-if noWander:
+elif noWander:
     IMG_DIR = RES_DIR + os.sep.join("Plots/No Wander/".split('/'))
     PARAMS_DIR = RES_DIR + os.sep.join("Params/No Wander/".split('/'))
-if twoWarmBelts:
+elif twoWarmBelts:
     IMG_DIR = RES_DIR + os.sep.join("Plots/Two Warm Belts/".split('/'))
     PARAMS_DIR = RES_DIR + os.sep.join("Params/Two Warm Belts/".split('/'))
 
