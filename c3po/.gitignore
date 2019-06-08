@@ -1,0 +1,3 @@
+# Ignore models that are still in development
+fitting_routines.py
+!.gitignore

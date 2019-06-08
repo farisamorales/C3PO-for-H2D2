@@ -6,6 +6,12 @@ from scipy import constants
 
 # File Paths
 ARR_DIR = os.sep.join('Data/Arrays/'.split('/'))
+STAR_FILES  = os.sep.join('Data/StarFiles/'.split('/'))
+KURUCZ      = os.sep.join('Data/StellarModels/kurucz/'.split('/'))
+NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
+RES_DIR     = os.sep.join('Results/'.split('/'))
+INTERPS_DIR = os.sep.join('Data/Arrays/InterpGrainTemps/'.split('/'))
+FILTERS_DIR = os.sep.join('Data/FilterResponse/'.split('/'))
 
 # Frequently used arrays
 GRAINSIZES = np.loadtxt(ARR_DIR + 'GrainSizes.dat')
@@ -191,6 +197,38 @@ class Star:
         self.graindex2 = graindex2
         self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
 
+    def calcFluxWarmMinGrains(self, waves, r0, blS, T_0=1):
+        sigma = 0.10
+        r0 *= 1.4959787066e11
+        rindex = np.where(np.logical_and(self.radii<1.4*r0,
+            self.radii>0.6*r0))[0]
+        radii1 = self.radii[rindex]
+        grainTemps = self.grainTemps['AstroSil'][rindex]
+        graindex = find_nearest_ind(GRAINSIZES, blS)
+        grains = GRAINSIZES[graindex:self.graindex1]/1.0e6
+        blS /= 1e6
+        q = -3.5
+        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        ca = T_0*np.exp(exponent)*np.abs(3+q) \
+            / (np.pi*(np.power(blS,3+q)-np.power(self.blowoutSize1,3+q)))
+        ca *= 1e6
+        ca1 = np.reshape(ca, (1, ca.size, 1))
+        grains1 = np.reshape(grains, (grains.size, 1, 1))
+        waves1 = np.broadcast_to(waves, (1, waves.size))
+        temps1 = np.broadcast_to(
+            grainTemps[:,graindex:self.graindex1],
+                (1, grainTemps[:,graindex:self.graindex1].shape[0],
+                grainTemps[:,graindex:self.graindex1].shape[1])).T
+        emis1 = np.reshape(self.emis['AstroSil'][graindex:self.graindex1],
+            (self.emis['AstroSil'][graindex:self.graindex1].shape[0], 1,
+            self.emis['AstroSil'][graindex:self.graindex1].shape[1]))
+        radii1 = np.reshape(radii1, (1, radii1.size, 1))
+        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
+        fnu = integrate.simps(
+            integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
+        fnu /= self.starD**2
+        return fnu*1.6497496140234523e-07
+
     def calcFluxBlSWarm(self, waves, r0, blS, T_0=1):
         sigma = 0.10
         r0 *= 1.4959787066e11
@@ -248,37 +286,6 @@ class Star:
         emis1 = np.reshape(self.emis['DirtyIceAstroSil'][graindex:],
             (self.emis['DirtyIceAstroSil'][graindex:].shape[0], 1,
             self.emis['DirtyIceAstroSil'][graindex:].shape[1]))
-        radii1 = np.reshape(radii1, (1, radii1.size, 1))
-        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
-
-    def calcFluxMinGrains(self, waves, r0, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
-        rindex = np.where(np.logical_and(self.radii<1.4*r0,
-            self.radii>0.6*r0))[0]
-        radii1 = self.radii[rindex]
-        grainTemps = self.grainTemps['AstroSil'][rindex]
-        grains = GRAINSIZES[:self.graindex1]/1.0e6
-        blS = self.blowoutSize1/1e6
-        q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
-        ca *= 1e6
-
-        ca1 = np.reshape(ca, (1, ca.size, 1))
-        grains1 = np.reshape(grains, (grains.size, 1, 1))
-        waves1 = np.broadcast_to(waves, (1, waves.size))
-        temps1 = np.broadcast_to(
-            grainTemps[:,:self.graindex1],
-                (1, grainTemps[:,:self.graindex1].shape[0],
-                grainTemps[:,:self.graindex1].shape[1])).T
-        emis1 = np.reshape(self.emis['AstroSil'][:self.graindex1],
-            (self.emis['AstroSil'][:self.graindex1].shape[0], 1,
-            self.emis['AstroSil'][:self.graindex1].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
         fnu = integrate.simps(integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)

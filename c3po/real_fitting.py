@@ -6,17 +6,6 @@ import matplotlib.pyplot as plt
 from astropy.io import ascii
 import sed_config
 
-# Directories for the various input data and output results
-STAR_FILES  = os.sep.join('Data/StarFiles/'.split('/'))
-KURUCZ      = os.sep.join('Data/StellarModels/kurucz/'.split('/'))
-NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
-RES_DIR     = os.sep.join('Results/'.split('/'))
-INTERPS_DIR = os.sep.join('Data/Arrays/InterpGrainTemps/'.split('/'))
-FILTERS_DIR = os.sep.join('Data/FilterResponse/'.split('/'))
-
-# Load the spatially resolved radii as seen by Herschel
-spatialRadii = sed_config.load_spatial_radii()
-
 ################################################################################
 ####                          Begin Options
 ################################################################################
@@ -42,6 +31,10 @@ saveResults = 0
 saturation_limits = 0
 # Toggle using the resolved radii for the cold belt initial guess & bounds
 useSpatialRadii = 1
+# Show the resolved radius on the plot:
+showResolved = 1
+# Show the minimum blow out size on the plot:
+showMinGrain = 1
 
 # Fitting routines (only 1 can be active at once):
 # One warm belt with a wandering grain size and one fixed grain size cold belt:
@@ -61,26 +54,29 @@ for name in names:
     name = name.strip()
     starNames.append(name)
 
-starNames = [starNames[0]]
+# starNames = starNames[1:]
+starNames = [ starNames[1] ]
 
 
 ################################################################################
 ####                           END OPTIONS
 ################################################################################
 
+# Load the spatially resolved radii as seen by Herschel
+spatialRadii = sed_config.load_spatial_radii()
 
 if oneWander:
-    IMG_DIR = RES_DIR + os.sep.join("Plots/Warm Wander/".split('/'))
-    PARAMS_DIR = RES_DIR + os.sep.join("Params/Warm Wander/".split('/'))
+    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Warm Wander/".split('/'))
+    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Warm Wander/".split('/'))
 elif twoWander:
-    IMG_DIR = RES_DIR + os.sep.join("Plots/Both Wander/".split('/'))
-    PARAMS_DIR = RES_DIR + os.sep.join("Params/Both Wander/".split('/'))
+    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Both Wander/".split('/'))
+    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Both Wander/".split('/'))
 elif noWander:
-    IMG_DIR = RES_DIR + os.sep.join("Plots/No Wander/".split('/'))
-    PARAMS_DIR = RES_DIR + os.sep.join("Params/No Wander/".split('/'))
+    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/No Wander/".split('/'))
+    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/No Wander/".split('/'))
 elif twoWarmBelts:
-    IMG_DIR = RES_DIR + os.sep.join("Plots/Two Warm Belts/".split('/'))
-    PARAMS_DIR = RES_DIR + os.sep.join("Params/Two Warm Belts/".split('/'))
+    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Two Warm Belts/".split('/'))
+    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Two Warm Belts/".split('/'))
 
 # Main loop definition.
 def run_fits(starName):
@@ -120,7 +116,7 @@ def run_fits(starName):
         }
 
     # Read in the star file
-    starData = ascii.read(STAR_FILES+'{}_stitched.txt'.format(starName))
+    starData = ascii.read(sed_config.STAR_FILES+'{}_stitched.txt'.format(starName))
 
     # Read in the stellar properties
     starT    = starData.meta[kw]['TEMP'][va]    # Stellar Temperature
@@ -148,7 +144,7 @@ def run_fits(starName):
     starLabel = TEMP
 
     # Load the nextgen stellar model
-    ngWave, ngFlux   = np.loadtxt(NEXTGEN+ngfilename, unpack=True)
+    ngWave, ngFlux   = np.loadtxt(sed_config.NEXTGEN+ngfilename, unpack=True)
     ngWave, ngwIndex = np.unique(ngWave, return_index=True)
     ngFlux           = ngFlux[ngwIndex]
 
@@ -253,7 +249,7 @@ def run_fits(starName):
         # Convolve IRS data to the MIPS24 data
         MIPS24W = sData[mp24][wa]
         MIPS24F = sData[mp24][fx]
-        mipsw, mipsr = np.loadtxt(FILTERS_DIR + 'mips24_frf.txt',
+        mipsw, mipsr = np.loadtxt(sed_config.FILTERS_DIR + 'mips24_frf.txt',
             unpack=True)
         IRS24      = sed_config.convolve(mipsw, mipsr, spitzWaves, spitzFlux)
         spitzFlux *= (MIPS24F/IRS24)
@@ -308,13 +304,13 @@ def run_fits(starName):
     try:
         for grain in grainComps:
             grainTemps[grain] = np.load(
-                INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
+                sed_config.INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
     except:
         from sed_config import GRAIN_TEMPS_TOTAL
         sed_config.interpTemps(starT, GRAIN_TEMPS_TOTAL, grainComps)
         for grain in grainComps:
             grainTemps[grain] = np.load(
-                INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
+                sed_config.INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
 
     # Scale graintemps to the luminosity of the star
     grainTemps[innerGrain] *= np.power(starL, 0.25)
@@ -378,6 +374,7 @@ def run_fits(starName):
                     sTrigger = 0
     else:
         bbr2 = minRad*1.5
+        sTrigger = 0
 
     print( f"initial guess for RW: {bbr1}" )
     print( f"initial guess for RC: {bbr2}" )
@@ -440,14 +437,14 @@ def run_fits(starName):
         return n1*star1.calcFluxWarm2(waves, r0warm) \
             + n2*star1.calcFluxCold2(waves, r0cold) \
             + n3*ngFnu_fit \
-            + n4*star1.calcFluxBlSWarm(waves, r0warm, bls1)
+            + n4*star1.calcFluxWarmMinGrains(waves, r0warm, bls1)
 
     ############################################################################
     ####             Run the optimization routine
     ############################################################################
-    print("++++++++++++++++++++++++++++++++++++++++")
+    print("----------------------------------------")
     print( "      Begin Optimizing Parameters" )
-    print("++++++++++++++++++++++++++++++++++++++++")
+    print("----------------------------------------")
     rw = bbr1
     rc = bbr2
 
@@ -491,11 +488,12 @@ def run_fits(starName):
     elif twoWarmBelts:
         # params: r0warm, r0cold, bls1, n1, n2, n3, n4
         if useSpatialRadii and sTrigger:
-            lBounds = [0.3, bbr2-bbr2_unc, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
-            uBounds = [minRad, bbr2+bbr_unc, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
+            lBounds = [0.3, bbr2-bbr2_unc, 0.001, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
+            uBounds = [minRad, bbr2+bbr2_unc, blowoutSize1, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
         else:
-            lBounds = [0.3, minRad, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
-            uBounds = [minRad, 500, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
+            lBounds = [0.3, minRad, 0.001, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
+            uBounds = [minRad, 500, blowoutSize1, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
+        p0=(rw, rc, blowoutSize1/2, n_1, n_2, n_3, n_1)
 
     bounds =[lBounds, uBounds]
 
@@ -525,7 +523,7 @@ def run_fits(starName):
             )
     elif twoWarmBelts:
         popt, pcov = curve_fit(
-                warmCold, fitWaves, fitFlux, sigma=fitError,
+                twoWarmCold, fitWaves, fitFlux, sigma=fitError,
                 p0=p0,
                 bounds=bounds
                 )
@@ -619,6 +617,7 @@ def run_fits(starName):
     MEDIUM_SIZE = 12
     BIGGER_SIZE = 18
     fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
     plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
     plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
     plt.rc('axes', labelsize=BIGGER_SIZE)     # fontsize of the x and y labels
@@ -674,7 +673,7 @@ def run_fits(starName):
             label='Radial Location: %.2f AU'%RW)
         plt.plot(sed_config.WAVELENGTHS, y2, ls='--', color='r',
             label='Radial Location: %.2f AU'%RC)
-        plt.plot(sed_config.WAVELENGTHS, y3, ls='--', color='blue',
+        plt.plot(sed_config.WAVELENGTHS, y3, ls='.-', color='blue',
             label='Radial Location: %.2f AU'%RW)
 
     # Plot stellar model, total flux, and IRS data
@@ -739,9 +738,34 @@ def run_fits(starName):
     # Sometimes, though, we might have to move around the height of the
     # chi square value on the plot because of the legend covering it.
     plt.xlim(.5,300)
-    plt.text(.55, lowerylimit*1.2, r' Reduced $\chi ^2$: %.1f'
-        %chiSqr)
-    plt.legend()
+    plt.text(0.98, 0.98, r"Reduced $\chi^2$: %0.1f"%(chiSqr),
+        ha = 'right', va = 'top', transform = ax.transAxes)
+
+    # Show the resolved radial location (if available)
+    if showResolved and sTrigger:
+        plt.text(0.98, 0.92, f"{r'r$_{herschel}$'}: ({bbr2} +- {bbr2_unc}) AU",
+            ha = 'right', va = 'top', transform = ax.transAxes)
+
+    # Show the minimum grain size
+    if showMinGrain:
+        if oneWander:
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif twoWander:
+            plt.text(0.98, 0.86, f"inner a{r'$_{min}$'}: {bls1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.80, f"outer a{r'$_{min}$'}: {bls2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif noWander:
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif twoWarmBelts:
+            plt.text(0.98, 0.86, f"small a{r'$_{min}$'}: {bls1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.80, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+
+    plt.legend(loc='lower left')
     if saveFigure:
         plt.savefig(IMG_DIR+starName+'.png', bbox_inches='tight')
     if showFigure:
