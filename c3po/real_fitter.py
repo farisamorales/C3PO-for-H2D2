@@ -418,8 +418,8 @@ def run_fits(starName):
     # option: noWander
     def warmCold(waves, r0warm, r0cold, n1, n2, n3):
         ''' Standard realistic grain fit: one warm belt, one cold belt '''
-        return n1*star1.calcFluxWarm2(waves, r0warm) \
-            + n2*star1.calcFluxCold2(waves, r0cold) \
+        return n1*star1.calcFluxWarm(waves, r0warm) \
+            + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit
     # option: oneWander
     def oneWarmWander(waves, r0warm, r0cold, bls, n1, n2, n3):
@@ -436,8 +436,8 @@ def run_fits(starName):
             + n3*ngFnu_fit
     # option: twoWarmBelts
     def twoWarmCold(waves, r0warm, r0cold, bls1, n1, n2, n3, n4):
-        return n1*star1.calcFluxWarm2(waves, r0warm) \
-            + n2*star1.calcFluxCold2(waves, r0cold) \
+        return n1*star1.calcFluxWarm(waves, r0warm) \
+            + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit \
             + n4*star1.calcFluxWarmMinGrains(waves, r0warm, bls1)
 
