@@ -3,6 +3,16 @@ import os
 import numpy as np
 from scipy import integrate
 from scipy import constants
+from astropy.io import ascii
+
+'''
+One thing I noticed is that the temperatures calculator does not work if it is
+done using b_nu instead of b_lam. There's likely something that I'm missing,
+having to do with the fact that emissivity is calculated with respect to the
+wavelength instead of frequency? Not sure exactly but I'm inclined to also now
+question the accuracy of the black body model using b_nu instead of b_lam
+during fitting.
+'''
 
 # File Paths
 ARR_DIR = os.sep.join('Data/Arrays/'.split('/'))
@@ -12,6 +22,7 @@ NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
 RES_DIR     = os.sep.join('Results/'.split('/'))
 INTERPS_DIR = os.sep.join('Data/Arrays/InterpGrainTemps/'.split('/'))
 FILTERS_DIR = os.sep.join('Data/FilterResponse/'.split('/'))
+GRAIN_TEMPS_DIR = os.sep.join('Data/GrainTemps/'.split('/'))
 
 # Frequently used arrays
 GRAINSIZES = np.loadtxt(ARR_DIR + 'GrainSizes.dat')
@@ -42,7 +53,18 @@ def find_nearest_ind(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return idx
-
+# Wrapper for the IPAC reader function
+def ascii_read(starFile):
+    '''
+    Returns a dictionary with all of the comments included as keys
+    '''
+    x = ascii.read(starFile)
+    data = {}
+    for column in x.itercols():
+        data[column.name] = column
+    for key in x.meta['keywords'].keys():
+        data[key] = x.meta['keywords'][key]['value']
+    return data
 # Convolution function for calibrating data
 def convolve(filterwaves, filterresponse, datawaves, dataflux):
     top = integrate.simps(
@@ -118,6 +140,16 @@ def b_nu(wavelengths, temperature):
     bottom = C**2 * (np.exp(exponent) - 1)
     return top/bottom
 
+def b_lam(wavelengths, temperature):
+    H = constants.h
+    C = constants.c
+    K = constants.k
+    wavelengths_m = wavelengths/1.0e6
+    top = 2 * H * C**2
+    exponent = (H*C)/(wavelengths_m*K*temperature)
+    bottom = wavelengths_m**5 * (np.exp(exponent) - 1)
+    return top/bottom
+
 # Calculate the minimum blowout size given stellar properties
 def blowout_size(grainDensity, starL=1., starM=1., qRad=0.9):
     # Calculate blowout grain size
@@ -184,10 +216,11 @@ def interpTemps(starTemp, oldGrainTemps, grainComps):
 
 # Star object handles all of the flux calculations
 class Star:
-    def __init__(self, starD, starL, gTemps, blowoutSize1, blowoutSize2, emis,
-                 grains, graindex1, graindex2):
+    def __init__(self, starD, starL, starT, gTemps, blowoutSize1, blowoutSize2,
+        emis, grains, graindex1, graindex2):
         self.starD = starD
         self.starL = starL
+        self.starT = starT
         self.grainTemps = gTemps
         self.blowoutSize1 = blowoutSize1
         self.blowoutSize2 = blowoutSize2

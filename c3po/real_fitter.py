@@ -5,15 +5,22 @@ from scipy.optimize import curve_fit
 import matplotlib.pyplot as plt
 from astropy.io import ascii
 import sed_config
+import temps_config
 
 ################################################################################
 ####                          Begin Options
 ################################################################################
 
+# Set the upper and lower bounds for the fitting
 # Upper bound for the cold belt radius:
 maxRad = 500
 # Sets the bound multiplier for the blowout size:
-blsBound = 10
+# Inner belt
+blsBoundLowerIn = 10
+blsBoundUpperIn = 3
+# Outer belt
+blsBoundUpperOut = 3
+blsBoundLowerOut = 10
 # Sets the bound multiplier for the belt radius:
 beltBound = 1e2
 # Scalar multiplier for the warm belt minimum blowout size
@@ -35,14 +42,16 @@ useSpatialRadii = 1
 showResolved = 1
 # Show the minimum blow out size on the plot:
 showMinGrain = 1
+# Show the IRS variance on the plot
+showIRSVariance = 0
 
 # Fitting routines (only 1 can be active at once):
 # One warm belt with a wandering grain size and one fixed grain size cold belt:
 oneWander = 0
 # One warm belt and one cold belt, both with wandering grain sizes:
-twoWander = 0
+twoWander = 1
 # One warm belt and one cold belt (fixed blowout size):
-noWander = 1
+noWander = 0
 # Two co-located warm belts (one wandering & one fixed) and one fixed cold belt:
 twoWarmBelts = 0
 
@@ -54,9 +63,8 @@ for name in names:
     name = name.strip()
     starNames.append(name)
 
-# starNames = starNames[1:]
-starNames = [ starNames[1] ]
-
+# starNames = [ starNames[0] ]
+# starNames = starNames[5:]
 
 ################################################################################
 ####                           END OPTIONS
@@ -82,6 +90,9 @@ elif twoWarmBelts:
 def run_fits(starName):
     # Convenience variables
     wa, fx, er, kw, va = 'wavelength', 'flux', 'error', 'keywords', 'value'
+
+    # Compositions of the grains.
+    grainComps = ['AstroSil', 'DirtyIceAstroSil']
 
     # Instrument names
     mj, mh, mk      = '2MASSJ', '2MASSH', '2MASSK'
@@ -183,25 +194,21 @@ def run_fits(starName):
     # Saturation limits for each instrument
     satLims = {mj:10.057, mh:10.24, mk:10.566, w1:0.18, w2:0.36, w3:0.88,
         w4:12.0, h70: 220., h100:510., h160:1125., mp24:np.inf, mp70:np.inf}
-
     # Create a list of instrument names for non-spitzer/non-upper limit data
     totalInsts = list()
     for i, f in enumerate(instFlags):
         if f:
             totalInsts.append(instNames[i])
-
     # Create a list of instrument names for upper limits data
     ulInsts = list()
     for i, f in enumerate(ulFlags):
         if f:
             ulInsts.append(ulNames[i])
-
     # Create a list of instruments names for spitzer data
     spitzInsts = list()
     for i, f in enumerate(spitzFlags):
         if f:
             spitzInsts.append(spitzNames[i])
-
     # Colors for plotting accessed by instrument name
     plotColors = {
         mj: 'r', mh: 'r', mk: 'r',
@@ -211,7 +218,6 @@ def run_fits(starName):
         h70:   'purple', h100:   'purple', h160:   'purple',
         h70ul: 'purple', h100ul: 'purple', h160ul: 'purple',
         }
-
     # Begin the arrays that will be used in the fitting optimization function.
     fitWaves = np.array([])
     fitFlux = np.array([])
@@ -227,7 +233,6 @@ def run_fits(starName):
                 fitWaves = np.append(fitWaves, sData[inst][wa])
                 fitFlux  = np.append(fitFlux, sData[inst][fx])
                 fitError = np.append(fitError, sData[inst][er])
-
     if ulInsts:
         for inst in ulInsts:
             fitWaves = np.append(fitWaves, sData[inst][wa])
@@ -256,7 +261,6 @@ def run_fits(starName):
         fitWaves   = np.append(fitWaves, spitzWaves)
         fitFlux    = np.append(fitFlux, spitzFlux)
         fitError   = np.append(fitError, spitzError)
-
     # Else, just add the spitzer data
     elif not mp24f and len(spitzInsts) > 0:
         fitWaves  = np.append(fitWaves, spitzWaves)
@@ -264,7 +268,6 @@ def run_fits(starName):
         fitError  = np.append(fitError, spitzError)
 
     # Organize all data by increasing wavelength.
-    # New sorting routine !!! (why so dumb before?)
     ind = np.argsort(fitWaves)
     fitWaves = fitWaves[ind]
     fitFlux  = fitFlux[ind]
@@ -283,12 +286,6 @@ def run_fits(starName):
         n_3   = (dataFluxNorm/ngFluxNorm)
         ngFnu = n_3 * ngFnu
 
-    # plt.scatter(fitWaves, fitFlux)
-    # plt.semilogx()
-    # plt.semilogy()
-    # plt.show()
-    # quit()
-
     # Interpolate the stellar model to the fitting data wavelengths
     ngFnu_fit = np.e**np.interp(np.log(fitWaves), np.log(ngWave), np.log(ngFnu))
 
@@ -296,29 +293,38 @@ def run_fits(starName):
     # Calculate blowoutsize given grain density
     blowoutSize1 = sed_config.blowout_size(densities[innerGrain], starL, starM)*blScalar1
     blowoutSize2 = sed_config.blowout_size(densities[outerGrain], starL, starM)*blScalar2
-    # Load the grain temperatures per grain composition
-    grainTemps = dict()
-    grainComps = ['AstroSil', 'DirtyIceAstroSil']
-    # These files should be made already, but if not, then the script will
-    # create them and then save them for subsequent fits.
-    try:
-        for grain in grainComps:
-            grainTemps[grain] = np.load(
-                sed_config.INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
-    except:
-        from sed_config import GRAIN_TEMPS_TOTAL
-        sed_config.interpTemps(starT, GRAIN_TEMPS_TOTAL, grainComps)
-        for grain in grainComps:
-            grainTemps[grain] = np.load(
-                sed_config.INTERPS_DIR+'%.0fK_%s.npy'%(starT, grain))
-
-    # Scale graintemps to the luminosity of the star
-    grainTemps[innerGrain] *= np.power(starL, 0.25)
-    grainTemps[outerGrain] *= np.power(starL, 0.25)
-
     # Index of grains greater than the blowout size
     graindex1 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize1)
     graindex2 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize2)
+
+    # Load emissivities per grain comp (use these for hi res plots)
+    TOTAL_EMISSIVITIES = dict()
+    for grain in grainComps:
+        TOTAL_EMISSIVITIES[grain] = np.load(sed_config.ARR_DIR+grain+'Emissivities.npy')
+
+    # NOTE: this part is possibly inefficient? can fix later
+    # hi res arrays needed to calculate the grain temps
+    star2 = sed_config.Star(starD, starL, starT, None, blowoutSize1,
+        blowoutSize2, TOTAL_EMISSIVITIES, sed_config.GRAINSIZES, graindex1,
+        graindex2)
+
+    # Load the grain temperatures per grain composition
+    grainTemps = dict()
+    # These files should be made already, but if not, then the script will
+    # create them and then save them for subsequent fits.
+    for grain in grainComps:
+        try:
+            grainTemps[grain] = np.load(
+                sed_config.GRAIN_TEMPS_DIR+"%s_%s.npy"%(starName, grain))
+        except:
+            grainTemps[grain] = temps_config.calcTemps(star2, grain)
+            np.save(sed_config.GRAIN_TEMPS_DIR+"%s_%s.npy"%(starName, grain),
+                grainTemps[grain], allow_pickle=False)
+
+    # hi res arrays, now with grain temps
+    star2 = sed_config.Star(starD, starL, starT, grainTemps, blowoutSize1,
+        blowoutSize2, TOTAL_EMISSIVITIES, sed_config.GRAINSIZES, graindex1,
+        graindex2)
 
     # Grab the minimum radial location that's below the temp
     # of sublimation for volatiles. (Icy belt radius)
@@ -330,8 +336,6 @@ def run_fits(starName):
 
     radii = np.logspace(-1, 3, 1000)
     minRad = radii[minRad]
-
-    # print ("minrad: ", minRad*np.sqrt(starL)*0.5, "Stellar T", starT)
     radii *= 1.4959787066e11
 
     print( '----------------------------------------' )
@@ -339,11 +343,6 @@ def run_fits(starName):
     print( '     IMP blowout size: %.2f' % blowoutSize2 )
     print( '       r0 lower limit: %.2f'  % (0.5*starL) )
     print( ' Minimum radius for an icy belt: %.2f' % (minRad) )
-
-    # Load emissivities per grain comp (use these for hi res plots)
-    TOTAL_EMISSIVITIES = dict()
-    for grain in grainComps:
-        TOTAL_EMISSIVITIES[grain] = np.load(sed_config.ARR_DIR+grain+'Emissivities.npy')
 
     # Interp emissivities to fitWaves (use these for fitting)
     emis = {}
@@ -372,6 +371,10 @@ def run_fits(starName):
                 except:
                     bbr2 = minRad*1.5
                     sTrigger = 0
+                break
+        else:
+            bbr2 = minRad*1.5
+            sTrigger = 0
     else:
         bbr2 = minRad*1.5
         sTrigger = 0
@@ -379,13 +382,13 @@ def run_fits(starName):
     print( f"initial guess for RW: {bbr1}" )
     print( f"initial guess for RC: {bbr2}" )
 
-    star1 = sed_config.Star(starD, starL, grainTemps, blowoutSize1, blowoutSize2,
-        emis, sed_config.GRAINSIZES, graindex1, graindex2)
-
+    # Low res for fitting star
+    star1 = sed_config.Star(starD, starL, starT, grainTemps, blowoutSize1,
+        blowoutSize2, emis, sed_config.GRAINSIZES, graindex1, graindex2)
+    # Normalize warm and cold dust
     bb1 = star1.calcFluxWarm(fitWaves, bbr1)
     bb2 = star1.calcFluxCold(fitWaves, bbr2)
-
-    # Normalize warm dust
+    # warm
     if mp24f:
         n_1 = np.nanmean(sData[mp24][fx]) / bb1.max()
     elif ll1f:
@@ -395,7 +398,7 @@ def run_fits(starName):
         n_1 = np.nanmean(sData[w4][fx]) / bb1.max()
     else:
         n_1 = 1
-    # Normalize cold dust
+    # cold
     if mp70f:
         n_2 = np.nanmean(sData[mp70][fx]) / bb2.max()
     elif h70f:
@@ -406,7 +409,6 @@ def run_fits(starName):
         n_2 = np.nanmean(sData[h160][fx]) / bb2.max()
     else:
         n_2 = n_1
-
     # Reset norm factor for ngfNu
     n_3 = 1
 
@@ -432,7 +434,7 @@ def run_fits(starName):
         return n1*star1.calcFluxBlSWarm(waves, r0warm, bls1) \
             + n2*star1.calcFluxBlSCold(waves, r0cold, bls2) \
             + n3*ngFnu_fit
-    # option: twoWarmBelts                     THIS PART NEEDS TO BE REFINED??!!
+    # option: twoWarmBelts
     def twoWarmCold(waves, r0warm, r0cold, bls1, n1, n2, n3, n4):
         return n1*star1.calcFluxWarm2(waves, r0warm) \
             + n2*star1.calcFluxCold2(waves, r0cold) \
@@ -447,34 +449,42 @@ def run_fits(starName):
     print("----------------------------------------")
     rw = bbr1
     rc = bbr2
+    # SetBounds
+    if  blsBoundUpperIn < 1 or 1./blsBoundLowerIn > 1:
+        p0bls1 = blowoutSize1*np.average([blsBoundUpperIn, 1./blsBoundLowerIn])
+    else:
+        p0bls1 = blowoutSize1
+    if  blsBoundUpperOut < 1 or 1./blsBoundLowerOut > 1:
+        p0bls2 = blowoutSize2*np.average([blsBoundUpperOut, 1./blsBoundLowerOut])
+    else:
+        p0bls2 = blowoutSize2
 
     if oneWander:
         # parameters: r0warm, r0cold, bls, n1, n2, n3
         if useSpatialRadii and sTrigger:
             lBounds = [0.3, bbr2-bbr2_unc, 1e-3,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, bbr2+bbr2_unc, blowoutScalar*blowoutSize1,
+            uBounds = [minRad, bbr2+bbr2_unc, blsBoundUpperIn*blowoutSize1,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
         else:
             lBounds = [0.3, minRad, 1e-3, n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, maxRad, 10*blowoutSize1, n_1*beltBound, n_2*beltBound,
-                    n_3*1.2]
-        p0=(rw, rc, blowoutSize1, n_1, n_2, n_3)
+            uBounds = [minRad, maxRad, blsBoundUpperIn*blowoutSize1,
+                n_1*beltBound, n_2*beltBound, n_3*1.2]
+        p0=(rw, rc, p0bls1, n_1, n_2, n_3)
 
     elif twoWander:
         # parameters: r0warm, r0cold, bls1, bls2, n1, n2, n3
         if useSpatialRadii and sTrigger:
-            lBounds = [0.3, bbr2 - bbr2_unc, blowoutSize1/blsBound, blowoutSize2/blsBound,
+            lBounds = [0.3, bbr2 - bbr2_unc, blowoutSize1/blsBoundLowerIn, blowoutSize2/blsBoundLowerOut,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, bbr2 + bbr2_unc, blowoutSize1*blsBound, blowoutSize2*blsBound,
+            uBounds = [minRad, bbr2 + bbr2_unc, blowoutSize1*blsBoundUpperIn, blowoutSize2*blsBoundUpperOut,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
         else:
-            lBounds = [0.3, minRad, blowoutSize1/blsBound, blowoutSize2/blsBound,
+            lBounds = [0.3, minRad, blowoutSize1/blsBoundLowerIn, blowoutSize2/blsBoundLowerOut,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, maxRad, blowoutSize1*blsBound, blowoutSize2*blsBound,
+            uBounds = [minRad, maxRad, blowoutSize1*blsBoundUpperIn, blowoutSize2*blsBoundUpperOut,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
-        p0=(rw, rc, blowoutSize1*0.5, blowoutSize2*5, n_1, n_2, n_3)
-
+        p0=(rw, rc, p0bls1, p0bls2, n_1, n_2, n_3)
     elif noWander:
         # parameters: r0warm, r0cold, n1, n2, n3
         if useSpatialRadii and sTrigger:
@@ -494,11 +504,9 @@ def run_fits(starName):
             lBounds = [0.3, minRad, 0.001, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
             uBounds = [minRad, 500, blowoutSize1, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
         p0=(rw, rc, blowoutSize1/2, n_1, n_2, n_3, n_1)
-
     bounds =[lBounds, uBounds]
 
-    # Timer for the routine
-    before = time.perf_counter()
+    before = time.perf_counter() # Timer for the routine
     # Call the optimization routine here.
     if oneWander:
         popt, pcov = curve_fit(
@@ -598,7 +606,7 @@ def run_fits(starName):
         print( f'  Minimum BlowoutSize: {bls1:.2f}')
     print( '----------------------------------------' )
 
-    # Number of data points minus number of fitting parameters
+    # Calculate chi square value
     if oneWander:
         resid = (fitFlux-oneWarmWander(fitWaves, RW, RC, bls, n1, n2, n3))/fitError
         degsFreedom = fitWaves.size - 6
@@ -616,8 +624,12 @@ def run_fits(starName):
     SMALL_SIZE = 8
     MEDIUM_SIZE = 12
     BIGGER_SIZE = 18
-    fig = plt.figure(figsize=(8, 6))
-    ax = fig.add_subplot(111)
+    if showIRSVariance:
+        fig = plt.figure(figsize=(8, 10))
+        ax = fig.add_subplot(211)
+    else:
+        fig = plt.figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
     plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
     plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
     plt.rc('axes', labelsize=BIGGER_SIZE)     # fontsize of the x and y labels
@@ -625,10 +637,6 @@ def run_fits(starName):
     plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
     plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
-
-    # hi res arrays for the optimized fluxes
-    star2 = sed_config.Star(starD, starL, grainTemps, blowoutSize1, blowoutSize2,
-        TOTAL_EMISSIVITIES, sed_config.GRAINSIZES, graindex1, graindex2)
 
     if oneWander:
         y1 = n1 * star2.calcFluxBlSWarm(sed_config.WAVELENGTHS, RW, bls)
@@ -655,26 +663,26 @@ def run_fits(starName):
     # Plot realistic grain fluxes
     if oneWander:
         plt.plot(sed_config.WAVELENGTHS, y1, ls='--', color='blue',
-            label='Radial Location: %.2f AU'%RW)
+            label=r'R$_0$ Warm: %.2f AU'%RW)
         plt.plot(sed_config.WAVELENGTHS, y2, ls='--', color='r',
-            label='Radial Location: %.2f AU'%RC)
+            label='R$_0$ Cold: %.2f AU'%RC)
     elif twoWander:
         plt.plot(sed_config.WAVELENGTHS, y1, ls='--', color='blue',
-            label='Radial Location: %.2f AU'%RW)
+            label=r'R$_0$ Warm: %.2f AU'%RW)
         plt.plot(sed_config.WAVELENGTHS, y2, ls='--', color='r',
-            label='Radial Location: %.2f AU'%RC)
+            label='R$_0$ Cold: %.2f AU'%RC)
     elif noWander:
         plt.plot(sed_config.WAVELENGTHS, y1, ls='--', color='blue',
-            label='Radial Location: %.2f AU'%RW)
+            label=r'R$_0$ Warm: %.2f AU'%RW)
         plt.plot(sed_config.WAVELENGTHS, y2, ls='--', color='r',
-            label='Radial Location: %.2f AU'%RC)
+            label='R$_0$ Cold: %.2f AU'%RC)
     elif twoWarmBelts:
         plt.plot(sed_config.WAVELENGTHS, y1, ls='--', color='blue',
-            label='Radial Location: %.2f AU'%RW)
+            label=r'R$_0$ Warm: %.2f AU'%RW)
         plt.plot(sed_config.WAVELENGTHS, y2, ls='--', color='r',
-            label='Radial Location: %.2f AU'%RC)
-        plt.plot(sed_config.WAVELENGTHS, y3, ls='.-', color='blue',
-            label='Radial Location: %.2f AU'%RW)
+            label=r'R$_0$ Cold: %.2f AU'%RC)
+        plt.plot(sed_config.WAVELENGTHS, y3, ls='-.', color='blue',
+            label=r'R$_0$ SmallGrains: %.2f AU'%RW)
 
     # Plot stellar model, total flux, and IRS data
     plt.plot(ngWave, n3*ngFnu, color = 'gray',
@@ -734,14 +742,12 @@ def run_fits(starName):
         upperylimit = fitFlux.max()*1.5
     plt.ylim(lowerylimit, upperylimit)
 
-    # The x limits are standard
-    # Sometimes, though, we might have to move around the height of the
-    # chi square value on the plot because of the legend covering it.
+    # The x limits are standard (we only have data for certain wavelengths)
     plt.xlim(.5,300)
     plt.text(0.98, 0.98, r"Reduced $\chi^2$: %0.1f"%(chiSqr),
         ha = 'right', va = 'top', transform = ax.transAxes)
 
-    # Show the resolved radial location (if available)
+    # Show the resolved radial location (if available and selected)
     if showResolved and sTrigger:
         plt.text(0.98, 0.92, f"{r'r$_{herschel}$'}: ({bbr2} +- {bbr2_unc}) AU",
             ha = 'right', va = 'top', transform = ax.transAxes)
@@ -749,12 +755,20 @@ def run_fits(starName):
     # Show the minimum grain size
     if showMinGrain:
         if oneWander:
-            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bls: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif twoWander:
             plt.text(0.98, 0.86, f"inner a{r'$_{min}$'}: {bls1: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
             plt.text(0.98, 0.80, f"outer a{r'$_{min}$'}: {bls2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.74, f"inner bls: {blowoutSize1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.68, f"outer bls: {blowoutSize2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.62, f"inner {r'f$_{mb}$'}: {bls1/blowoutSize1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.56, f"outer {r'f$_{mb}$'}: {bls2/blowoutSize2: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif noWander:
             plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
@@ -766,6 +780,13 @@ def run_fits(starName):
                 ha = 'right', va = 'top', transform = ax.transAxes)
 
     plt.legend(loc='lower left')
+    if showIRSVariance:
+        ax = fig.add_subplot(212)
+        indices = np.where(np.logical_and(fitWaves>= spitzWaves[0], fitWaves<= spitzWaves[-1]))
+        variance = fitFlux - warmColdWander(fitWaves, RW, RC, bls1, bls2, n1, n2, n3)
+        plt.plot(fitWaves[indices], variance[indices])
+        plt.axhline()
+
     if saveFigure:
         plt.savefig(IMG_DIR+starName+'.png', bbox_inches='tight')
     if showFigure:
@@ -777,7 +798,36 @@ def run_fits(starName):
 ################################################################################
 
 if __name__ == '__main__':
+
+    starNames = starNames[7:]
+
     for stn, starName in enumerate(starNames):
+        # Conditional statements for the bounds on the fitting parameters
+        # depending on the star. This changes depending on what the user of the
+        # code sees when doing the fitting.
+
+        # UPPER BOUNDS on cold belt
+        if starName == 'HD 110411':
+            # Indicative of cleaner ice water in the outer region since it needs
+            # a narrower SED for the cold belt
+            blsBoundUpperOut = 1
+        if starName == 'HD 113337':
+            blsBoundUpperOut = 5
+        else: # default is 5
+            blsBoundUpperOut = 5
+
+        # Lower bound is how much the bound is divided by. Use a fraction
+        # to increase the lower bound
+        # LOWER BOUNDS on cold belt
+        if starName == 'HD 110897':
+            blsBoundLowerOut = 1/3
+        if starName == 'HD 113337':
+            blsBoundLowerOut = 1
+        else: # default is 10
+            blsBoundLowerOut = 10
+
+
+
         print("++++++++++++++++++++++++++++++++++++++++")
         print(f" Running fit #{stn+1} of {len(starNames)} for star: {starName}")
         print("++++++++++++++++++++++++++++++++++++++++")
