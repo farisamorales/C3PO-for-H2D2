@@ -120,11 +120,16 @@ if __name__ == '__main__':
 
     gTemps = interp_to_star(energy_in, energy_out, temps)
 
+    radii = np.logspace(-1, 3, 1000)
 
     for i in range(10):
-        plt.loglog(sed_config.GRAINSIZES, gTemps[i*10])
+        plt.loglog(sed_config.GRAINSIZES, gTemps[i*100], label=radii[i*100])
+    plt.legend()
     plt.show()
 
+
+
     for i in range(10):
-        plt.loglog(sed_config.DISK_RADII, gTemps[:, i*10])
+        plt.loglog(radii, gTemps[:, i*10], label=sed_config.GRAINSIZES[i*10])
+    plt.legend()
     plt.show()

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from astropy.io import ascii
 import sed_config
 import temps_config
+import bound_options
 
 ################################################################################
 ####                          Begin Options
@@ -14,7 +15,7 @@ import temps_config
 # Set the upper and lower bounds for the fitting
 # Upper bound for the cold belt radius:
 maxRad = 500
-# Sets the bound multiplier for the blowout size:
+# Sets the bound multiplier for the blowout size (these are default values):
 # Inner belt
 blsBoundLowerIn = 10
 blsBoundUpperIn = 3
@@ -22,7 +23,7 @@ blsBoundUpperIn = 3
 blsBoundUpperOut = 3
 blsBoundLowerOut = 10
 # Sets the bound multiplier for the belt radius:
-beltBound = 1e2
+beltBound = 6
 # Scalar multiplier for the warm belt minimum blowout size
 blScalar1 = 1
 # Scalar multiplier for the cold belt minimum blowout size
@@ -386,31 +387,55 @@ def run_fits(starName):
     star1 = sed_config.Star(starD, starL, starT, grainTemps, blowoutSize1,
         blowoutSize2, emis, sed_config.GRAINSIZES, graindex1, graindex2)
     # Normalize warm and cold dust
-    bb1 = star1.calcFluxWarm(fitWaves, bbr1)
-    bb2 = star1.calcFluxCold(fitWaves, bbr2)
+    if oneWander:
+        bb1 = star1.calcFluxBlSWarm(fitWaves, bbr1, blowoutSize1)
+        bb2 = star1.calcFluxCold(fitWaves, bbr2)
+    elif twoWander:
+        bb1 = star1.calcFluxBlSWarm(fitWaves, bbr1, blowoutSize1)
+        bb2 = star1.calcFluxBlSCold(fitWaves, bbr2, blowoutSize2)
+    elif noWander:
+        bb1 = star1.calcFluxWarm(fitWaves, bbr1)
+        bb2 = star1.calcFluxCold(fitWaves, bbr2)
+    elif twoWarmBelts:
+        bb1 = star1.calcFluxWarm(fitWaves, bbr1)
+        bb2 = star1.calcFluxCold(fitWaves, bbr2)
     # warm
-    if mp24f:
-        n_1 = np.nanmean(sData[mp24][fx]) / bb1.max()
-    elif ll1f:
-        index2 = np.where(np.logical_and(sData[ll1][wa]>20, sData[ll1][wa]<25))
-        n_1 = np.nanmean(sData[ll1][fx][index2]) / bb1.max()
-    elif w4f:
-        n_1 = np.nanmean(sData[w4][fx]) / bb1.max()
-    else:
-        n_1 = 1
+    n_1 = fitFlux.min() / bb1.max() # new test
+    # if mp24f:
+    #     n_1 = np.nanmean(sData[mp24][fx]) / bb1.max()
+    # elif ll1f:
+    #     index2 = np.where(np.logical_and(sData[ll1][wa]>20, sData[ll1][wa]<25))
+    #     n_1 = np.nanmean(sData[ll1][fx][index2]) / bb1.max()
+    # elif w4f:
+    #     n_1 = np.nanmean(sData[w4][fx]) / bb1.max()
+    # else:
+    #     n_1 = 1
+    n_2 = fitFlux[-3:].max() / bb2.max()
     # cold
-    if mp70f:
-        n_2 = np.nanmean(sData[mp70][fx]) / bb2.max()
-    elif h70f:
-        n_2 = np.nanmean(sData[h70][fx]) / bb2.max()
-    elif h100f:
-        n_2 = np.nanmean(sData[h100][fx]) / bb2.max()
-    elif h160f:
-        n_2 = np.nanmean(sData[h160][fx]) / bb2.max()
-    else:
-        n_2 = n_1
+    # if mp70f:
+    #     n_2 = np.nanmean(sData[mp70][fx]) / bb2.max()
+    # elif h70f:
+    #     n_2 = np.nanmean(sData[h70][fx]) / bb2.max()
+    # elif h100f:
+    #     n_2 = np.nanmean(sData[h100][fx]) / bb2.max()
+    # elif h160f:
+    #     n_2 = np.nanmean(sData[h160][fx]) / bb2.max()
+    # else:
+    #     n_2 = n_1
     # Reset norm factor for ngfNu
     n_3 = 1
+
+    # plt.plot(fitWaves, n_1*bb1)
+    # plt.plot(fitWaves, n_2*bb2)
+    # plt.scatter(fitWaves, fitFlux)
+    # plt.plot(ngWave, ngFnu)
+    # plt.xlim(1, 300)
+    # plt.ylim(n_1*bb1.max()*0.1, n_2*bb2.max()*100 )
+    # plt.semilogx()
+    # plt.semilogy()
+    # plt.show()
+    # return
+
 
     ############################################################################
     ####      Fitting functions for optimization routine
@@ -749,7 +774,7 @@ def run_fits(starName):
 
     # Show the resolved radial location (if available and selected)
     if showResolved and sTrigger:
-        plt.text(0.98, 0.92, f"{r'r$_{herschel}$'}: ({bbr2} +- {bbr2_unc}) AU",
+        plt.text(0.98, 0.92, f"{r'r$_{herschel}$'}: ({bbr2} +/- {bbr2_unc}) AU",
             ha = 'right', va = 'top', transform = ax.transAxes)
 
     # Show the minimum grain size
@@ -799,34 +824,15 @@ def run_fits(starName):
 
 if __name__ == '__main__':
 
-    starNames = starNames[7:]
-
+    # starNames = starNames[7:]
     for stn, starName in enumerate(starNames):
         # Conditional statements for the bounds on the fitting parameters
         # depending on the star. This changes depending on what the user of the
         # code sees when doing the fitting.
 
-        # UPPER BOUNDS on cold belt
-        if starName == 'HD 110411':
-            # Indicative of cleaner ice water in the outer region since it needs
-            # a narrower SED for the cold belt
-            blsBoundUpperOut = 1
-        if starName == 'HD 113337':
-            blsBoundUpperOut = 5
-        else: # default is 5
-            blsBoundUpperOut = 5
-
-        # Lower bound is how much the bound is divided by. Use a fraction
-        # to increase the lower bound
-        # LOWER BOUNDS on cold belt
-        if starName == 'HD 110897':
-            blsBoundLowerOut = 1/3
-        if starName == 'HD 113337':
-            blsBoundLowerOut = 1
-        else: # default is 10
-            blsBoundLowerOut = 10
-
-
+        blsBoundLowerIn, blsBoundUpperIn, blsBoundLowerOut, blsBoundUpperOut = (
+            bound_options.boundify(starName)
+            )
 
         print("++++++++++++++++++++++++++++++++++++++++")
         print(f" Running fit #{stn+1} of {len(starNames)} for star: {starName}")

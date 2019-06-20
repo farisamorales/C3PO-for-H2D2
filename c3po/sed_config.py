@@ -257,10 +257,9 @@ class Star:
             self.emis['AstroSil'][graindex:self.graindex1].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(
-            integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
+        f = integrate.simps(integrate.simps(flux, grains, axis=0),
+            self.radii[rindex], axis=0)
+        return f*1.649407760419599e-07/(self.starD**2)
 
     def calcFluxBlSWarm(self, waves, r0, blS, T_0=1):
         sigma = 0.10
@@ -276,7 +275,6 @@ class Star:
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
-        ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -289,10 +287,13 @@ class Star:
             self.emis['AstroSil'][graindex:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(
+        f = integrate.simps(
             integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
+        # Convert to Jy -> 1e26
+        # Convert star distance to meters -> 3.086e16
+        # The below constant is: 1e26 / (3.086e16**2) * np.pi / 2
+        # computation is faster if we just skip to this.
+        return f*1.649407760419599e-07/(self.starD**2)
 
     def calcFluxBlSCold(self, waves, r0, blS, T_0=1):
         sigma = 0.10
@@ -308,7 +309,6 @@ class Star:
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
-        ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -321,9 +321,13 @@ class Star:
             self.emis['DirtyIceAstroSil'][graindex:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
+        f = integrate.simps(integrate.simps(flux, grains, axis=0),
+            self.radii[rindex], axis=0)
+        # Convert to Jy -> 1e26
+        # Convert star distance to meters -> 3.086e16
+        # The below constant is: 1e26 / (3.086e16**2) * np.pi / 2
+        # computation is faster if we just skip to this.
+        return f*1.649407760419599e-07/(self.starD**2)
 
     def calcFluxWarm(self, waves, r0, T_0=1):
         sigma = 0.10
@@ -338,7 +342,6 @@ class Star:
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
-        ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -351,9 +354,9 @@ class Star:
             self.emis['AstroSil'][self.graindex1:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
+        f = integrate.simps(integrate.simps(flux, grains, axis=0),
+            self.radii[rindex], axis=0)
+        return f*1.649407760419599e-07/(self.starD**2)
 
     def calcFluxCold(self, waves, r0, T_0=1):
         sigma = 0.10
@@ -381,6 +384,6 @@ class Star:
             self.emis['DirtyIceAstroSil'][self.graindex2:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
-        fnu = integrate.simps(integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
-        fnu /= self.starD**2
-        return fnu*1.6497496140234523e-07
+        f = integrate.simps(integrate.simps(flux, grains, axis=0),
+            self.radii[rindex], axis=0)
+        return f*1.649407760419599e-07/(self.starD**2)
