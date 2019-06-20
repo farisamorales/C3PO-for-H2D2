@@ -1,3 +1,7 @@
+'''
+Set the bounds for individual stars using this file.
+'''
+
 def boundify(starName):
     ############################################################################
     #                           COLD BELT BOUNDS
@@ -8,12 +12,12 @@ def boundify(starName):
     if starName == 'HD 110411':
         # Indicative of cleaner ice water in the outer region since it needs
         # a narrower SED for the cold belt
-        blsBoundUpperOut = 1
+        bosHighOuter = 1
     elif starName == 'HD 113337':
-        blsBoundUpperOut = 5
+        bosHighOuter = 5
 
     else: # default is 5
-        blsBoundUpperOut = 5
+        bosHighOuter = 5
 
     # Lower bound is how much the bound is divided by. Use a fraction
     # to increase the lower bound
@@ -21,11 +25,11 @@ def boundify(starName):
     # LOWER BOUNDS
     ###############
     if starName == 'HD 110897':
-        blsBoundLowerOut = 1/3
+        bosLowOuter = 1/3
     elif starName == 'HD 113337':
-        blsBoundLowerOut = 1
+        bosLowOuter = 1
     else: # default is 10
-        blsBoundLowerOut = 10
+        bosLowOuter = 10
 
 
     ############################################################################
@@ -35,9 +39,9 @@ def boundify(starName):
     # UPPER BOUNDS
     ###############
     if starName == 'HD 110411':
-        blsBoundUpperIn = 3
+        bosHighInner = 3
     else:
-        blsBoundUpperIn = 3
+        bosHighInner = 3
 
     ###############
     # LOWER BOUNDS
@@ -45,9 +49,9 @@ def boundify(starName):
     # Lower bound is how much the bound is divided by. Use a fraction
     # to increase the lower bound
     if starName == 'HD 110411':
-        blsBoundLowerIn = 10
+        bosLowInner = 10
     else:
-        blsBoundLowerIn = 10
+        bosLowInner = 10
 
 
-    return blsBoundLowerIn, blsBoundUpperIn, blsBoundLowerOut, blsBoundUpperOut
+    return bosLowInner, bosHighInner, bosLowOuter, bosHighOuter

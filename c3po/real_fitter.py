@@ -7,85 +7,8 @@ from astropy.io import ascii
 import sed_config
 import temps_config
 import bound_options
+from fitting_options import *
 
-################################################################################
-####                          Begin Options
-################################################################################
-
-# Set the upper and lower bounds for the fitting
-# Upper bound for the cold belt radius:
-maxRad = 500
-# Sets the bound multiplier for the blowout size (these are default values):
-# Inner belt
-blsBoundLowerIn = 10
-blsBoundUpperIn = 3
-# Outer belt
-blsBoundUpperOut = 3
-blsBoundLowerOut = 10
-# Sets the bound multiplier for the belt radius:
-beltBound = 6
-# Scalar multiplier for the warm belt minimum blowout size
-blScalar1 = 1
-# Scalar multiplier for the cold belt minimum blowout size
-blScalar2 = 1
-
-# Toggle plots showing after each fit:
-showFigure = 1
-# Toggle plots saving into their respective directories after each fit:
-saveFigure = 0
-# Toggle save into a results table (not complete yet):
-saveResults = 0
-# Toggle discarding measurements beyond the saturation limit:
-saturation_limits = 0
-# Toggle using the resolved radii for the cold belt initial guess & bounds
-useSpatialRadii = 1
-# Show the resolved radius on the plot:
-showResolved = 1
-# Show the minimum blow out size on the plot:
-showMinGrain = 1
-# Show the IRS variance on the plot
-showIRSVariance = 0
-
-# Fitting routines (only 1 can be active at once):
-# One warm belt with a wandering grain size and one fixed grain size cold belt:
-oneWander = 0
-# One warm belt and one cold belt, both with wandering grain sizes:
-twoWander = 1
-# One warm belt and one cold belt (fixed blowout size):
-noWander = 0
-# Two co-located warm belts (one wandering & one fixed) and one fixed cold belt:
-twoWarmBelts = 0
-
-# Grab star names
-starNames = []
-with open(os.sep.join("Data/starNames.txt".split('/')), 'r') as f:
-    names = f.readlines()
-for name in names:
-    name = name.strip()
-    starNames.append(name)
-
-# starNames = [ starNames[0] ]
-# starNames = starNames[5:]
-
-################################################################################
-####                           END OPTIONS
-################################################################################
-
-# Load the spatially resolved radii as seen by Herschel
-spatialRadii = sed_config.load_spatial_radii()
-
-if oneWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Warm Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Warm Wander/".split('/'))
-elif twoWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Both Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Both Wander/".split('/'))
-elif noWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/No Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/No Wander/".split('/'))
-elif twoWarmBelts:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Two Warm Belts/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Two Warm Belts/".split('/'))
 
 # Main loop definition.
 def run_fits(starName):
@@ -110,7 +33,7 @@ def run_fits(starName):
     innerGrain = 'AstroSil'
     outerGrain = 'DirtyIceAstroSil'
 
-    # Grain densities. Important for calculating the blowoutsize of the grains.
+    # Grain densities. Important for calculating the blowout size of the grains.
     densities = {
         # For the density of the grains:
         # Mixture of H20:NH3 is 3:1 and 10% vlfr of aC to make dirty ice.
@@ -292,8 +215,8 @@ def run_fits(starName):
 
     # Create the star objects
     # Calculate blowoutsize given grain density
-    blowoutSize1 = sed_config.blowout_size(densities[innerGrain], starL, starM)*blScalar1
-    blowoutSize2 = sed_config.blowout_size(densities[outerGrain], starL, starM)*blScalar2
+    blowoutSize1 = sed_config.blowout_size(densities[innerGrain], starL, starM)*bosScalar1
+    blowoutSize2 = sed_config.blowout_size(densities[outerGrain], starL, starM)*bosScalar2
     # Index of grains greater than the blowout size
     graindex1 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize1)
     graindex2 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize2)
@@ -329,15 +252,16 @@ def run_fits(starName):
 
     # Grab the minimum radial location that's below the temp
     # of sublimation for volatiles. (Icy belt radius)
+    # This could potentially break in the future if the grain temps happen to be
+    # broken. In that case, we would NOT want a for/else loop because it would
+    # be ideal to catch a case of incorrect temps instead
     for r in range(1000):
         # If mean temp < 120, then that becomes the min radius
         if np.nanmean(grainTemps[outerGrain][r]) < 120:
             minRad = r
             break
 
-    radii = np.logspace(-1, 3, 1000)
-    minRad = radii[minRad]
-    radii *= 1.4959787066e11
+    minRad = np.logspace(-1, 3, 1000)[minRad]
 
     print( '----------------------------------------' )
     print( '      AS blowout size: %.2f'  % blowoutSize1 )
@@ -380,19 +304,19 @@ def run_fits(starName):
         bbr2 = minRad*1.5
         sTrigger = 0
 
-    print( f"initial guess for RW: {bbr1}" )
-    print( f"initial guess for RC: {bbr2}" )
+    print( f"initial guess for RW: {bbr1: 0.2f}" )
+    print( f"initial guess for RC: {bbr2: 0.2f}" )
 
     # Low res for fitting star
     star1 = sed_config.Star(starD, starL, starT, grainTemps, blowoutSize1,
         blowoutSize2, emis, sed_config.GRAINSIZES, graindex1, graindex2)
     # Normalize warm and cold dust
     if oneWander:
-        bb1 = star1.calcFluxBlSWarm(fitWaves, bbr1, blowoutSize1)
+        bb1 = star1.calcFluxBoSWarm(fitWaves, bbr1, blowoutSize1)
         bb2 = star1.calcFluxCold(fitWaves, bbr2)
     elif twoWander:
-        bb1 = star1.calcFluxBlSWarm(fitWaves, bbr1, blowoutSize1)
-        bb2 = star1.calcFluxBlSCold(fitWaves, bbr2, blowoutSize2)
+        bb1 = star1.calcFluxBoSWarm(fitWaves, bbr1, blowoutSize1)
+        bb2 = star1.calcFluxBoSCold(fitWaves, bbr2, blowoutSize2)
     elif noWander:
         bb1 = star1.calcFluxWarm(fitWaves, bbr1)
         bb2 = star1.calcFluxCold(fitWaves, bbr2)
@@ -401,30 +325,12 @@ def run_fits(starName):
         bb2 = star1.calcFluxCold(fitWaves, bbr2)
     # warm
     n_1 = fitFlux.min() / bb1.max() # new test
-    # if mp24f:
-    #     n_1 = np.nanmean(sData[mp24][fx]) / bb1.max()
-    # elif ll1f:
-    #     index2 = np.where(np.logical_and(sData[ll1][wa]>20, sData[ll1][wa]<25))
-    #     n_1 = np.nanmean(sData[ll1][fx][index2]) / bb1.max()
-    # elif w4f:
-    #     n_1 = np.nanmean(sData[w4][fx]) / bb1.max()
-    # else:
-    #     n_1 = 1
-    n_2 = fitFlux[-3:].max() / bb2.max()
     # cold
-    # if mp70f:
-    #     n_2 = np.nanmean(sData[mp70][fx]) / bb2.max()
-    # elif h70f:
-    #     n_2 = np.nanmean(sData[h70][fx]) / bb2.max()
-    # elif h100f:
-    #     n_2 = np.nanmean(sData[h100][fx]) / bb2.max()
-    # elif h160f:
-    #     n_2 = np.nanmean(sData[h160][fx]) / bb2.max()
-    # else:
-    #     n_2 = n_1
+    n_2 = fitFlux[-3:].max() / bb2.max()
     # Reset norm factor for ngfNu
     n_3 = 1
 
+    # Show the normalized belts with observed flux and stellar model
     # plt.plot(fitWaves, n_1*bb1)
     # plt.plot(fitWaves, n_2*bb2)
     # plt.scatter(fitWaves, fitFlux)
@@ -447,24 +353,24 @@ def run_fits(starName):
             + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit
     # option: oneWander
-    def oneWarmWander(waves, r0warm, r0cold, bls, n1, n2, n3):
+    def oneWarmWander(waves, r0warm, r0cold, bos, n1, n2, n3):
         ''' one warm belt with a wandering blowout grain size, one cold belt '''
-        return n1*star1.calcFluxBlSWarm(waves, r0warm, bls) \
+        return n1*star1.calcFluxBoSWarm(waves, r0warm, bos) \
             + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit
     # option: twoWander
-    def warmColdWander(waves, r0warm, r0cold, bls1, bls2, n1, n2, n3):
+    def warmColdWander(waves, r0warm, r0cold, bos1, bos2, n1, n2, n3):
         ''' one warm belt with a wandering blowout grain size,
         one cold belt with a wandering blowout grain size'''
-        return n1*star1.calcFluxBlSWarm(waves, r0warm, bls1) \
-            + n2*star1.calcFluxBlSCold(waves, r0cold, bls2) \
+        return n1*star1.calcFluxBoSWarm(waves, r0warm, bos1) \
+            + n2*star1.calcFluxBoSCold(waves, r0cold, bos2) \
             + n3*ngFnu_fit
     # option: twoWarmBelts
-    def twoWarmCold(waves, r0warm, r0cold, bls1, n1, n2, n3, n4):
+    def twoWarmCold(waves, r0warm, r0cold, bos1, n1, n2, n3, n4):
         return n1*star1.calcFluxWarm(waves, r0warm) \
             + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit \
-            + n4*star1.calcFluxWarmMinGrains(waves, r0warm, bls1)
+            + n4*star1.calcFluxWarmMinGrains(waves, r0warm, bos1)
 
     ############################################################################
     ####             Run the optimization routine
@@ -474,42 +380,43 @@ def run_fits(starName):
     print("----------------------------------------")
     rw = bbr1
     rc = bbr2
-    # SetBounds
-    if  blsBoundUpperIn < 1 or 1./blsBoundLowerIn > 1:
-        p0bls1 = blowoutSize1*np.average([blsBoundUpperIn, 1./blsBoundLowerIn])
+    # Set initial guess for the blowout size. If the bounded region includes the
+    # calculated blowout size, use that, else go in between the bounds.
+    if  bosHighInner < 1 or 1./bosLowInner > 1:
+        p0bos1 = blowoutSize1*np.average([bosHighInner, 1./bosLowInner])
     else:
-        p0bls1 = blowoutSize1
-    if  blsBoundUpperOut < 1 or 1./blsBoundLowerOut > 1:
-        p0bls2 = blowoutSize2*np.average([blsBoundUpperOut, 1./blsBoundLowerOut])
+        p0bos1 = blowoutSize1
+    if  bosHighOuter < 1 or 1./bosLowOuter > 1:
+        p0bos2 = blowoutSize2*np.average([bosHighOuter, 1./bosLowOuter])
     else:
-        p0bls2 = blowoutSize2
+        p0bos2 = blowoutSize2
 
     if oneWander:
-        # parameters: r0warm, r0cold, bls, n1, n2, n3
+        # parameters: r0warm, r0cold, bos, n1, n2, n3
         if useSpatialRadii and sTrigger:
             lBounds = [0.3, bbr2-bbr2_unc, 1e-3,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, bbr2+bbr2_unc, blsBoundUpperIn*blowoutSize1,
+            uBounds = [minRad, bbr2+bbr2_unc, bosHighInner*blowoutSize1,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
         else:
             lBounds = [0.3, minRad, 1e-3, n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, maxRad, blsBoundUpperIn*blowoutSize1,
+            uBounds = [minRad, maxRad, bosHighInner*blowoutSize1,
                 n_1*beltBound, n_2*beltBound, n_3*1.2]
-        p0=(rw, rc, p0bls1, n_1, n_2, n_3)
+        p0=(rw, rc, p0bos1, n_1, n_2, n_3)
 
     elif twoWander:
-        # parameters: r0warm, r0cold, bls1, bls2, n1, n2, n3
+        # parameters: r0warm, r0cold, bos1, bos2, n1, n2, n3
         if useSpatialRadii and sTrigger:
-            lBounds = [0.3, bbr2 - bbr2_unc, blowoutSize1/blsBoundLowerIn, blowoutSize2/blsBoundLowerOut,
+            lBounds = [0.3, bbr2 - bbr2_unc, blowoutSize1/bosLowInner, blowoutSize2/bosLowOuter,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, bbr2 + bbr2_unc, blowoutSize1*blsBoundUpperIn, blowoutSize2*blsBoundUpperOut,
+            uBounds = [minRad, bbr2 + bbr2_unc, blowoutSize1*bosHighInner, blowoutSize2*bosHighOuter,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
         else:
-            lBounds = [0.3, minRad, blowoutSize1/blsBoundLowerIn, blowoutSize2/blsBoundLowerOut,
+            lBounds = [0.3, minRad, blowoutSize1/bosLowInner, blowoutSize2/bosLowOuter,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
-            uBounds = [minRad, maxRad, blowoutSize1*blsBoundUpperIn, blowoutSize2*blsBoundUpperOut,
+            uBounds = [minRad, maxRad, blowoutSize1*bosHighInner, blowoutSize2*bosHighOuter,
                     n_1*beltBound, n_2*beltBound, n_3*1.2]
-        p0=(rw, rc, p0bls1, p0bls2, n_1, n_2, n_3)
+        p0=(rw, rc, p0bos1, p0bos2, n_1, n_2, n_3)
     elif noWander:
         # parameters: r0warm, r0cold, n1, n2, n3
         if useSpatialRadii and sTrigger:
@@ -521,7 +428,7 @@ def run_fits(starName):
         p0=(rw, rc, n_1, n_2, n_3)
 
     elif twoWarmBelts:
-        # params: r0warm, r0cold, bls1, n1, n2, n3, n4
+        # params: r0warm, r0cold, bos1, n1, n2, n3, n4
         if useSpatialRadii and sTrigger:
             lBounds = [0.3, bbr2-bbr2_unc, 0.001, n_1/beltBound, n_2/beltBound, n_3*0.8, n_1/beltBound]
             uBounds = [minRad, bbr2+bbr2_unc, blowoutSize1, n_1*beltBound, n_2*beltBound, n_3*1.2, n_1*beltBound]
@@ -562,26 +469,26 @@ def run_fits(starName):
                 )
     # Unpack the parameters
     if oneWander:
-        RW, RC, bls, n1, n2, n3 = popt
+        RW, RC, bos, n1, n2, n3 = popt
         with open(PARAMS_DIR + f"{starName}.txt", 'w+') as f:
             f.write(f"Warm radius: {RW}\n"
                     f"Cold radius: {RC}\n"
                     f"Warm Blowoutsize: {blowoutSize1}\n"
                     f"Cold Blowoutsize: {blowoutSize2}\n"
-                    f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-                    f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n"
+                    f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+                    f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n"
                     f"n1: {n1}\n"
                     f"n2: {n2}\n"
                     f"n3: {n3}\n")
     elif twoWander:
-        RW, RC, bls1, bls2, n1, n2, n3 = popt
+        RW, RC, bos1, bos2, n1, n2, n3 = popt
         with open(PARAMS_DIR + f"{starName}.txt", 'w+') as f:
             f.write(f"Warm radius: {RW}\n"
                     f"Cold radius: {RC}\n"
                     f"Warm Blowoutsize: {blowoutSize1}\n"
                     f"Cold Blowoutsize: {blowoutSize2}\n"
-                    f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-                    f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n"
+                    f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+                    f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n"
                     f"n1: {n1}\n"
                     f"n2: {n2}\n"
                     f"n3: {n3}\n")
@@ -592,20 +499,20 @@ def run_fits(starName):
                     f"Cold radius: {RC}\n"
                     f"Warm Blowoutsize: {blowoutSize1}\n"
                     f"Cold Blowoutsize: {blowoutSize2}\n"
-                    f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-                    f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n"
+                    f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+                    f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n"
                     f"n1: {n1}\n"
                     f"n2: {n2}\n"
                     f"n3: {n3}\n")
     elif twoWarmBelts:
-        RW, RC, bls1, n1, n2, n3, n4 = popt
+        RW, RC, bos1, n1, n2, n3, n4 = popt
         with open(PARAMS_DIR + f"{starName}.txt", 'w+') as f:
             f.write(f"Warm radius: {RW}\n"
                     f"Cold radius: {RC}\n"
                     f"Warm Blowoutsize: {blowoutSize1}\n"
                     f"Cold Blowoutsize: {blowoutSize2}\n"
-                    f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-                    f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n"
+                    f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+                    f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n"
                     f"n1: {n1}\n"
                     f"n2: {n2}\n"
                     f"n3: {n3}\n"
@@ -617,32 +524,32 @@ def run_fits(starName):
     print( '          Cold norm: %.16f' % n2 )
     print( '       Stellar norm: %.2f' % n3 )
     if oneWander:
-        print( '      BlowoutSize: %.2f' % bls )
-        print( f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-               f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n")
+        print( '      BlowoutSize: %.2f' % bos )
+        print( f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+               f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n")
     elif twoWander:
-        print( f'  Warm BlowoutSize: {bls1:.2f}')
-        print( f'  Cold BlowoutSize: {bls2:.2f}')
-        print(f"Warm Blowoutsize Scalar Multiple: {blScalar1}\n"
-              f"Cold Blowoutsize Scalar Multiple: {blScalar2}\n")
+        print( f'  Warm BlowoutSize: {bos1:.2f}')
+        print( f'  Cold BlowoutSize: {bos2:.2f}')
+        print(f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
+              f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n")
     elif noWander:
         pass
     elif twoWarmBelts:
-        print( f'  Minimum BlowoutSize: {bls1:.2f}')
+        print( f'  Minimum BlowoutSize: {bos1:.2f}')
     print( '----------------------------------------' )
 
     # Calculate chi square value
     if oneWander:
-        resid = (fitFlux-oneWarmWander(fitWaves, RW, RC, bls, n1, n2, n3))/fitError
+        resid = (fitFlux-oneWarmWander(fitWaves, RW, RC, bos, n1, n2, n3))/fitError
         degsFreedom = fitWaves.size - 6
     elif twoWander:
-        resid = (fitFlux-warmColdWander(fitWaves, RW, RC, bls1, bls2, n1, n2, n3))/fitError
+        resid = (fitFlux-warmColdWander(fitWaves, RW, RC, bos1, bos2, n1, n2, n3))/fitError
         degsFreedom = fitWaves.size - 7
     elif noWander:
         resid = (fitFlux-warmCold(fitWaves, RW, RC, n1, n2, n3))/fitError
         degsFreedom = fitWaves.size - 5
     elif twoWarmBelts:
-        resid = (fitFlux-twoWarmCold(fitWaves, RW, RC, bls1, n1, n2, n3, n4))/fitError
+        resid = (fitFlux-twoWarmCold(fitWaves, RW, RC, bos1, n1, n2, n3, n4))/fitError
         degsFreedom = fitWaves.size - 7
     chiSqr = np.dot(resid, resid)/degsFreedom # Reduced chi square
 
@@ -664,13 +571,13 @@ def run_fits(starName):
     plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
 
     if oneWander:
-        y1 = n1 * star2.calcFluxBlSWarm(sed_config.WAVELENGTHS, RW, bls)
+        y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
         totalFlux = y1 + y2 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
     elif twoWander:
-        y1 = n1 * star2.calcFluxBlSWarm(sed_config.WAVELENGTHS, RW, bls1)
-        y2 = n2 * star2.calcFluxBlSCold(sed_config.WAVELENGTHS, RC, bls2)
+        y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos1)
+        y2 = n2 * star2.calcFluxBoSCold(sed_config.WAVELENGTHS, RC, bos2)
         totalFlux = y1 + y2 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
     elif noWander:
@@ -681,7 +588,7 @@ def run_fits(starName):
     elif twoWarmBelts:
         y1 = n1 * star2.calcFluxWarm(sed_config.WAVELENGTHS, RW)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
-        y3 = n4 * star2.calcFluxBlSWarm(sed_config.WAVELENGTHS, RW, bls1)
+        y3 = n4 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos1)
         totalFlux = y1 + y2 + y3 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
 
@@ -780,26 +687,26 @@ def run_fits(starName):
     # Show the minimum grain size
     if showMinGrain:
         if oneWander:
-            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bls: 0.4f} {chr(956)}m",
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bos: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif twoWander:
-            plt.text(0.98, 0.86, f"inner a{r'$_{min}$'}: {bls1: 0.4f}",
+            plt.text(0.98, 0.86, f"inner a{r'$_{min}$'}: {bos1: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
-            plt.text(0.98, 0.80, f"outer a{r'$_{min}$'}: {bls2: 0.4f}",
+            plt.text(0.98, 0.80, f"outer a{r'$_{min}$'}: {bos2: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
-            plt.text(0.98, 0.74, f"inner bls: {blowoutSize1: 0.4f}",
+            plt.text(0.98, 0.74, f"inner bos: {blowoutSize1: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
-            plt.text(0.98, 0.68, f"outer bls: {blowoutSize2: 0.4f}",
+            plt.text(0.98, 0.68, f"outer bos: {blowoutSize2: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
-            plt.text(0.98, 0.62, f"inner {r'f$_{mb}$'}: {bls1/blowoutSize1: 0.4f}",
+            plt.text(0.98, 0.62, f"inner {r'f$_{mb}$'}: {bos1/blowoutSize1: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
-            plt.text(0.98, 0.56, f"outer {r'f$_{mb}$'}: {bls2/blowoutSize2: 0.4f}",
+            plt.text(0.98, 0.56, f"outer {r'f$_{mb}$'}: {bos2/blowoutSize2: 0.4f}",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif noWander:
             plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif twoWarmBelts:
-            plt.text(0.98, 0.86, f"small a{r'$_{min}$'}: {bls1: 0.4f} {chr(956)}m",
+            plt.text(0.98, 0.86, f"small a{r'$_{min}$'}: {bos1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
             plt.text(0.98, 0.80, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
@@ -808,7 +715,7 @@ def run_fits(starName):
     if showIRSVariance:
         ax = fig.add_subplot(212)
         indices = np.where(np.logical_and(fitWaves>= spitzWaves[0], fitWaves<= spitzWaves[-1]))
-        variance = fitFlux - warmColdWander(fitWaves, RW, RC, bls1, bls2, n1, n2, n3)
+        variance = fitFlux - warmColdWander(fitWaves, RW, RC, bos1, bos2, n1, n2, n3)
         plt.plot(fitWaves[indices], variance[indices])
         plt.axhline()
 
@@ -830,7 +737,7 @@ if __name__ == '__main__':
         # depending on the star. This changes depending on what the user of the
         # code sees when doing the fitting.
 
-        blsBoundLowerIn, blsBoundUpperIn, blsBoundLowerOut, blsBoundUpperOut = (
+        bosLowInner, bosHighInner, bosLowOuter, bosHighOuter = (
             bound_options.boundify(starName)
             )
 

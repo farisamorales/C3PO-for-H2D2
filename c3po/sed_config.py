@@ -230,20 +230,20 @@ class Star:
         self.graindex2 = graindex2
         self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
 
-    def calcFluxWarmMinGrains(self, waves, r0, blS, T_0=1):
+    def calcFluxWarmMinGrains(self, waves, r0, bos, T_0=1):
         sigma = 0.10
         r0 *= 1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, blS)
+        graindex = find_nearest_ind(GRAINSIZES, bos)
         grains = GRAINSIZES[graindex:self.graindex1]/1.0e6
-        blS /= 1e6
+        bos /= 1e6
         q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(self.blowoutSize1,3+q)))
+            / (np.pi*(np.power(bos,3+q)-np.power(self.blowoutSize1,3+q)))
         ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
@@ -261,20 +261,20 @@ class Star:
             self.radii[rindex], axis=0)
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxBlSWarm(self, waves, r0, blS, T_0=1):
+    def calcFluxBoSWarm(self, waves, r0, bos, T_0=1):
         sigma = 0.10
         r0 *= 1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, blS)
+        graindex = find_nearest_ind(GRAINSIZES, bos)
         grains = GRAINSIZES[graindex:]/1.0e6
-        blS /= 1e6
+        bos /= 1e6
         q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
+            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -295,20 +295,20 @@ class Star:
         # computation is faster if we just skip to this.
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxBlSCold(self, waves, r0, blS, T_0=1):
+    def calcFluxBoSCold(self, waves, r0, bos, T_0=1):
         sigma = 0.10
         r0 *= 1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, blS)
+        graindex = find_nearest_ind(GRAINSIZES, bos)
         grains = GRAINSIZES[graindex:]/1.0e6
-        blS /= 1e6
+        bos /= 1e6
         q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
+            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -337,11 +337,11 @@ class Star:
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
         grains = GRAINSIZES[self.graindex1:]/1.0e6
-        blS = self.blowoutSize1/1e6
+        bos = self.blowoutSize1/1e6
         q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
+            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -366,11 +366,11 @@ class Star:
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
         grains = self.grains[self.graindex2:]/1.0e6
-        blS = self.blowoutSize2/1e6
+        bos = self.blowoutSize2/1e6
         q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(blS,3+q)-np.power(.001,3+q)))
+            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
