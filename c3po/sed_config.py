@@ -85,8 +85,8 @@ def load_spatial_radii():
         radial_hipname = line[1].strip()
         radial_loc = line[2].strip()
         radial_err = line[3].strip()
-        radial_loc = np.nan if radial_loc == '-' else float(radial_loc)
-        radial_err = np.nan if radial_err == '-' else float(radial_err)
+        radial_loc = np.float64(radial_loc)
+        radial_err = np.float64(radial_err)
         spatialRadii.append( [radial_name, radial_hipname, radial_loc, radial_err] )
     return spatialRadii
 

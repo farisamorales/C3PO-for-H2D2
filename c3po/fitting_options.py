@@ -21,6 +21,7 @@ for name in names:
 ################################################################################
 
 starNames = starNames[1:]
+starNames = ['HD 106252']
 
 
 # Set the upper and lower bounds for the fitting

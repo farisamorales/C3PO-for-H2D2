@@ -88,6 +88,38 @@ def run_fits(starName):
     ngFnu  = ngFlux*(ngWave**2)/c_cgs/1.0e8*1.0e23  #Jy
     ngWave = ngWave*1.0e-4                          #cm -> um
 
+    if TEMP > 10000:
+        # Load kurucz model
+        kzTemps = np.arange(3500, 10000, 250)
+        kzTemps = np.append(kzTemps, np.arange(10000, 13000, 500))
+        kzTemps = np.append(kzTemps, np.arange(13000, 35000, 1000))
+        kzTemps = np.append(kzTemps, np.arange(35000, 52500, 2500))
+        kzTemp = find_nearest(kzTemps, starT)
+        starLabel = kzTemp
+
+        kzfilename = 'kp00_'+str(kzTemp)+'g40.txt'
+        kzWave, kzFlux = np.loadtxt(sed_config.KURUCZ+kzfilename, unpack=True)
+        kzWave, kzwIndex = np.unique(kzWave, return_index=True)
+        kzFlux = kzFlux[kzwIndex]
+
+        # Convert the kurucz model to janskies
+        c_cgs = 2.99792458e10                          #cm/s
+        kzFnu = kzFlux*(kzWave**2)/c_cgs/1.0e8*1.0e23  #Jy
+        kzWave = kzWave*1.0e-4                         #cm -> um
+        index = np.where(kzWave < 2.154)
+        kzFnu = kzFnu[index]
+        kzWave = kzWave[index]
+
+        index = np.where(ngWave >= 2.154)
+        ngFnu = ngFnu[index]
+        ngWave = ngWave[index]
+
+        s_norm = np.nanmean(kzFnu[-5:])/np.nanmean(ngFnu[:5])
+        ngFnu *= s_norm
+
+        ngWave = np.array(list(kzWave)+list(ngWave))
+        ngFnu = np.array(list(kzFnu)+list(ngFnu))
+
     # Log all instruments and sort data by instrument. sData is a dictionary,
     # the keys of which are the instrument names. Within that are the fluxes,
     # the wavelengths, and errors.
@@ -290,7 +322,7 @@ def run_fits(starName):
                 bbr2 = np.float(spatialRadii[i][2])
                 bbr2_unc = np.float(spatialRadii[i][3])
                 try:
-                    if 3*bbr2_unc > bbr2:
+                    if 3*bbr2_unc > bbr2 or np.isnan(bbr2):
                         raise ValueError("No valid radius from Herschel")
                     sTrigger = 1
                 except:
