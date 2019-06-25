@@ -380,7 +380,7 @@ def run_fits(starName):
         bb1 = star1.calcFluxWarm(fitWaves, bbr1)
         bb2 = star1.calcFluxCold(fitWaves, bbr2)
     # warm
-    n_1 = fitFlux.min() / bb1.max() # new test
+    n_1 = fitFlux[np.where(fitFlux>0)].min() / bb1.max() # new test
     # cold
     n_2 = fitFlux[-3:].max() / bb2.max()
     # Reset norm factor for ngfNu
