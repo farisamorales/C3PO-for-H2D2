@@ -32,7 +32,7 @@ def run_fits(starName):
     # Grain compositions. This directly impacts the files that are loaded.
     innerGrain = 'AstroSil'
     outerGrain = 'DirtyIceAstroSil'
-
+    
     # Grain densities. Important for calculating the blowout size of the grains.
     densities = {
         # For the density of the grains:
@@ -195,16 +195,17 @@ def run_fits(starName):
             fitFlux  = np.append(fitFlux, sData[inst][fx])
             fitError = np.append(fitError, sData[inst][er])
 
-    fitters = np.where((fitWaves/fitFlux) < 3)
-    fitWaves = fitWaves[fitters]
-    fitFlux = fitFlux[fitters]
-    fitError = fitError[fitters]
-
-    ind = np.isfinite(fitFlux)
+    # Remove any UL data points
+    ind = np.where((fitWaves/fitFlux) < 3)
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
     fitError = fitError[ind]
 
+    # Remove any NaN data points (UL)
+    ind = np.isfinite(fitFlux)
+    fitWaves = fitWaves[ind]
+    fitFlux = fitFlux[ind]
+    fitError = fitError[ind]
     ind = np.isfinite(fitError)
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
