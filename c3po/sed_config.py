@@ -5,17 +5,9 @@ from scipy import integrate
 from scipy import constants
 from astropy.io import ascii
 
-'''
-One thing I noticed is that the temperatures calculator does not work if it is
-done using b_nu instead of b_lam. There's likely something that I'm missing,
-having to do with the fact that emissivity is calculated with respect to the
-wavelength instead of frequency? Not sure exactly but I'm inclined to also now
-question the accuracy of the black body model using b_nu instead of b_lam
-during fitting.
-'''
 
 # File Paths
-ARR_DIR = os.sep.join('Data/Arrays/'.split('/'))
+ARR_DIR     = os.sep.join('Data/Arrays/'.split('/'))
 STAR_FILES  = os.sep.join('Data/StarFiles/'.split('/'))
 KURUCZ      = os.sep.join('Data/StellarModels/kurucz/'.split('/'))
 NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
@@ -386,3 +378,31 @@ class Star:
         f = integrate.simps(integrate.simps(flux, grains, axis=0),
             self.radii[rindex], axis=0)
         return f*1.649407760419599e-07/(self.starD**2)
+
+    def deprecated_calcFluxCold(self, waves, r0, T_0 = 1):
+        '''
+        This is kept for use as a comparison to the new algorithm.
+        '''
+        sigma = 0.10
+        r0 *= 1.4959787066e11
+        rindex = np.where(np.logical_and(self.radii<1.4*r0,
+            self.radii>0.6*r0))[0]
+        radii1 = self.radii[rindex]
+        grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
+        grains = self.grains[self.graindex2:]/1.0e6
+        bos = self.blowoutSize2/1e6
+        q = -3.5
+        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        ca = T_0*np.exp(exponent)*np.abs(3+q) \
+            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+
+        # Integral loop
+        fw = np.empty(waves.size)
+        fr = np.empty(radii1.size)
+        for w in range(waves.size):
+            for r in range(radii1.size):
+                flux = b_nu(waves[w], grainTemps[r, self.graindex2:])
+                flux *= self.emis['DirtyIceAstroSil'][self.graindex2:,w] * (grains**-1.5) * radii1[r] * ca[r]
+                fr[r] = integrate.simps(flux, grains)
+            fw[w] = integrate.simps(fr, radii1)
+        return fw*1.649407760419599e-07/(self.starD**2)

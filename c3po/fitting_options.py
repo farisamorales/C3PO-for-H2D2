@@ -22,7 +22,7 @@ for name in names:
 
 starNames = starNames[1:]
 starNames = ['HD 106252']
-starNames = ['HD 105211', 'HD 106252']
+starNames = ['HD 204961', 'HD 105211', 'HD 106252']
 
 
 # Set the upper and lower bounds for the fitting

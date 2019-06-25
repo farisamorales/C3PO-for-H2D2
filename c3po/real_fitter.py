@@ -195,6 +195,21 @@ def run_fits(starName):
             fitFlux  = np.append(fitFlux, sData[inst][fx])
             fitError = np.append(fitError, sData[inst][er])
 
+    fitters = np.where((fitWaves/fitFlux) < 3)
+    fitWaves = fitWaves[fitters]
+    fitFlux = fitFlux[fitters]
+    fitError = fitError[fitters]
+
+    ind = np.isfinite(fitFlux)
+    fitWaves = fitWaves[ind]
+    fitFlux = fitFlux[ind]
+    fitError = fitError[ind]
+
+    ind = np.isfinite(fitError)
+    fitWaves = fitWaves[ind]
+    fitFlux = fitFlux[ind]
+    fitError = fitError[ind]
+
     # Create arrays for the stitched data
     if spitzInsts:
         spitzWaves = np.array([])
@@ -249,6 +264,7 @@ def run_fits(starName):
     # Calculate blowoutsize given grain density
     blowoutSize1 = sed_config.blowout_size(densities[innerGrain], starL, starM)*bosScalar1
     blowoutSize2 = sed_config.blowout_size(densities[outerGrain], starL, starM)*bosScalar2
+
     # Index of grains greater than the blowout size
     graindex1 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize1)
     graindex2 = sed_config.find_nearest_ind(sed_config.GRAINSIZES, blowoutSize2)
@@ -335,6 +351,14 @@ def run_fits(starName):
     else:
         bbr2 = minRad*1.5
         sTrigger = 0
+
+    if bbr2 > 1000:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print(f"The initial guess for the cold belt is {bbr2} which is greater")
+        print("than the highest possible value of 1000. Continuing with next")
+        print("star. In future, we may expand radial locations?")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        return
 
     print( f"initial guess for RW: {bbr1: 0.2f}" )
     print( f"initial guess for RC: {bbr2: 0.2f}" )
@@ -512,6 +536,8 @@ def run_fits(starName):
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print("ValueError: Either xdata or ydata contains NaN")
+        print("Check flux sigma for nan values.")
+        print("Use those points as UL data instead.")
         print("Continuing with next star")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
