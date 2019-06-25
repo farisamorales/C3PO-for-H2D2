@@ -362,17 +362,23 @@ def run_fits(starName):
     # Reset norm factor for ngfNu
     n_3 = 1
 
-    # Show the normalized belts with observed flux and stellar model
-    # plt.plot(fitWaves, n_1*bb1)
-    # plt.plot(fitWaves, n_2*bb2)
-    # plt.scatter(fitWaves, fitFlux)
-    # plt.plot(ngWave, ngFnu)
-    # plt.xlim(1, 300)
-    # plt.ylim(n_1*bb1.max()*0.1, n_2*bb2.max()*100 )
-    # plt.semilogx()
-    # plt.semilogy()
-    # plt.show()
-    # return
+    if showNormedBelts:
+        # Show the normalized belts with observed flux and stellar model
+        fig = plt.figure(figsize=(8, 6))
+        plt.plot(fitWaves, n_1*bb1, label='Warm Belt')
+        plt.plot(fitWaves, n_2*bb2, label='Cold Belt')
+        plt.scatter(fitWaves, fitFlux, label='Observed Data')
+        plt.plot(ngWave, ngFnu, label='Stellar Model')
+        plt.xlim(1, 300)
+        plt.ylim(n_1*bb1.max()*0.1, n_2*bb2.max()*100 )
+        plt.title(starName+': for seeing the normalized belts', fontsize=22)
+        plt.legend()
+        plt.xlabel(r'$\lambda$ ($\mu m$)')
+        plt.ylabel(r'$F_{\nu}$ ($Jy$)')
+        plt.semilogx()
+        plt.semilogy()
+        plt.show()
+        return
 
 
     ############################################################################
@@ -422,7 +428,6 @@ def run_fits(starName):
         p0bos2 = blowoutSize2*np.average([bosHighOuter, 1./bosLowOuter])
     else:
         p0bos2 = blowoutSize2
-
     if oneWander:
         # parameters: r0warm, r0cold, bos, n1, n2, n3
         if useSpatialRadii and sTrigger:
@@ -435,7 +440,6 @@ def run_fits(starName):
             uBounds = [minRad, maxRad, bosHighInner*blowoutSize1,
                 n_1*beltBound, n_2*beltBound, n_3*1.2]
         p0=(rw, rc, p0bos1, n_1, n_2, n_3)
-
     elif twoWander:
         # parameters: r0warm, r0cold, bos1, bos2, n1, n2, n3
         if useSpatialRadii and sTrigger:
@@ -458,7 +462,6 @@ def run_fits(starName):
             lBounds = [0.3, minRad, n_1/beltBound, n_2/beltBound, n_3*0.8]
             uBounds = [minRad, maxRad, n_1*beltBound, n_2*beltBound, n_3*1.2]
         p0=(rw, rc, n_1, n_2, n_3)
-
     elif twoWarmBelts:
         # params: r0warm, r0cold, bos1, n1, n2, n3, n4
         if useSpatialRadii and sTrigger:
@@ -471,35 +474,59 @@ def run_fits(starName):
     bounds =[lBounds, uBounds]
 
     before = time.perf_counter() # Timer for the routine
+
     # Call the optimization routine here.
-    if oneWander:
-        popt, pcov = curve_fit(
-            oneWarmWander, fitWaves, fitFlux, sigma=fitError,
-            p0=p0,
-            # absolute_sigma=True,
-            bounds=bounds
-            )
-    elif twoWander:
-        popt, pcov = curve_fit(
-            warmColdWander, fitWaves, fitFlux, sigma=fitError,
-            p0=p0,
-            # absolute_sigma=True,
-            bounds=bounds
-            )
-    elif noWander:
-        popt, pcov = curve_fit(
-            warmCold, fitWaves, fitFlux, sigma=fitError,
-            p0=p0,
-            # absolute_sigma=True,
-            bounds=bounds
-            )
-    elif twoWarmBelts:
-        popt, pcov = curve_fit(
-                twoWarmCold, fitWaves, fitFlux, sigma=fitError,
+    try:
+        if oneWander:
+            popt, pcov = curve_fit(
+                oneWarmWander, fitWaves, fitFlux, sigma=fitError,
                 p0=p0,
+                # absolute_sigma=True,
                 bounds=bounds
                 )
-    # Unpack the parameters
+        elif twoWander:
+            popt, pcov = curve_fit(
+                warmColdWander, fitWaves, fitFlux, sigma=fitError,
+                p0=p0,
+                # absolute_sigma=True,
+                bounds=bounds
+                )
+        elif noWander:
+            popt, pcov = curve_fit(
+                warmCold, fitWaves, fitFlux, sigma=fitError,
+                p0=p0,
+                # absolute_sigma=True,
+                bounds=bounds
+                )
+        elif twoWarmBelts:
+            popt, pcov = curve_fit(
+                    twoWarmCold, fitWaves, fitFlux, sigma=fitError,
+                    p0=p0,
+                    bounds=bounds
+                    )
+    except RuntimeError:
+        print("RuntimeError: The least squares minimization failed.")
+        print("Continuing with next star")
+        return
+    except ValueError:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("ValueError: Either xdata or ydata contains NaN")
+        print("Continuing with next star")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        return
+    except OptimizeWarning:
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("The covariance of the parameters cannot be estimated")
+        print("Continuing with next star")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        return
+
+
+    # Unpack the parameters and print them to the terminal for the user
     if oneWander:
         RW, RC, bos, n1, n2, n3 = popt
         with open(PARAMS_DIR + f"{starName}.txt", 'w+') as f:
@@ -589,9 +616,12 @@ def run_fits(starName):
     MEDIUM_SIZE = 12
     BIGGER_SIZE = 18
     if showIRSVariance:
+        # Create a figure with two plots, one for the model + data, one for the
+        # IRS variance
         fig = plt.figure(figsize=(8, 10))
         ax = fig.add_subplot(211)
     else:
+        # Otherwise just create a figure with a single plot for the model + data
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
     plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
@@ -602,6 +632,8 @@ def run_fits(starName):
     plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
 
+    # Calculate the high resolution totalFlux array given the optimized
+    # parameters
     if oneWander:
         y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
@@ -658,8 +690,8 @@ def run_fits(starName):
             label='Spitzer IRS')
 
     # Plot the rest of the real data and error bars
-    # We don't want distinct labels for upper limits, so we use this labels
-    # list to check if those instruments have already been plotted.
+    # We don't want distinct labels for upper limits, so we use this list
+    # of labels to check if those instruments have already been plotted.
     labels = []
     if totalInsts:
         for inst in totalInsts:
@@ -717,7 +749,7 @@ def run_fits(starName):
             ha = 'right', va = 'top', transform = ax.transAxes)
 
     # Show the minimum grain size
-    if showMinGrain:
+    if showMinGrain and sTrigger:
         if oneWander:
             plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bos: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
@@ -742,6 +774,31 @@ def run_fits(starName):
                 ha = 'right', va = 'top', transform = ax.transAxes)
             plt.text(0.98, 0.80, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
+    elif showMinGrain and not sTrigger:
+        if oneWander:
+            plt.text(0.98, 0.92, f"a{r'$_{min}$'}: {bos: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif twoWander:
+            plt.text(0.98, 0.92, f"inner a{r'$_{min}$'}: {bos1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.86, f"outer a{r'$_{min}$'}: {bos2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.80, f"inner bos: {blowoutSize1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.74, f"outer bos: {blowoutSize2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.68, f"inner {r'f$_{mb}$'}: {bos1/blowoutSize1: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.62, f"outer {r'f$_{mb}$'}: {bos2/blowoutSize2: 0.4f}",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif noWander:
+            plt.text(0.98, 0.92, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+        elif twoWarmBelts:
+            plt.text(0.98, 0.92, f"small a{r'$_{min}$'}: {bos1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {blowoutSize1: 0.4f} {chr(956)}m",
+                ha = 'right', va = 'top', transform = ax.transAxes)
 
     plt.legend(loc='lower left')
     if showIRSVariance:
@@ -765,15 +822,16 @@ if __name__ == '__main__':
 
     # starNames = starNames[7:]
     for stn, starName in enumerate(starNames):
-        # Conditional statements for the bounds on the fitting parameters
-        # depending on the star. This changes depending on what the user of the
-        # code sees when doing the fitting.
-
+        # Choose the bounds on the blowout sizes given the conditional
+        # statements in the bound_options.py file.
         bosLowInner, bosHighInner, bosLowOuter, bosHighOuter = (
             bound_options.boundify(starName)
             )
 
+        # Let's the user know which star is running and how many are being
+        # processed at a time.
         print("++++++++++++++++++++++++++++++++++++++++")
         print(f" Running fit #{stn+1} of {len(starNames)} for star: {starName}")
         print("++++++++++++++++++++++++++++++++++++++++")
+        # Call the fitting module on the star name.
         run_fits(starName)

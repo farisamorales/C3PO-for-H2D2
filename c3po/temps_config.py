@@ -62,7 +62,6 @@ def interp_to_star(energy_in, energy_out, temps):
                     )
     return np.exp(grainTemps)
 
-
 def calcTemps(star_obj, grainComp):
     '''
     This is function that will be used in sed_config to calculate the grain
@@ -86,24 +85,13 @@ def calcTemps(star_obj, grainComp):
     return gTemps
 
 
-temps = np.logspace(-1, 4, 100)
-starT = 9750
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 if __name__ == '__main__':
+    '''
+    Test the functionality of the grain temps calculator. Shows plots of the
+    grain temperatures vs grainsize and grain temperatures vs radial location.
+    '''
+    temps = np.logspace(-1, 4, 100)
+    starT = 9750
     # Energy from star
     energy_in = energin(sed_config.WAVELENGTHS, # um
         sed_config.EMISSIVITIES_TOTAL['AstroSil'], # scalar multiple
@@ -126,8 +114,6 @@ if __name__ == '__main__':
         plt.loglog(sed_config.GRAINSIZES, gTemps[i*100], label=radii[i*100])
     plt.legend()
     plt.show()
-
-
 
     for i in range(10):
         plt.loglog(radii, gTemps[:, i*10], label=sed_config.GRAINSIZES[i*10])

@@ -371,7 +371,6 @@ class Star:
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
-        ca *= 1e6
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))

@@ -22,6 +22,7 @@ for name in names:
 
 starNames = starNames[1:]
 starNames = ['HD 106252']
+starNames = ['HD 105211', 'HD 106252']
 
 
 # Set the upper and lower bounds for the fitting
@@ -57,6 +58,8 @@ showResolved = 1
 showMinGrain = 1
 # Show the IRS variance on the plot
 showIRSVariance = 0
+# Show the normalized belts
+showNormedBelts = 0
 
 # Fitting routines (only 1 can be active at once):
 # One warm belt with a wandering grain size and one fixed grain size cold belt:
