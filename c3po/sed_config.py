@@ -363,6 +363,8 @@ class Star:
         exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+
+        # NumPy Broadcasting enables calculations in C instead of Python
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -396,7 +398,7 @@ class Star:
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
 
-        # Integral loop
+        # Nested loop in Python
         fw = np.empty(waves.size)
         fr = np.empty(radii1.size)
         for w in range(waves.size):
