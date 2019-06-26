@@ -402,7 +402,8 @@ class Star:
         for w in range(waves.size):
             for r in range(radii1.size):
                 flux = b_nu(waves[w], grainTemps[r, self.graindex2:])
-                flux *= self.emis['DirtyIceAstroSil'][self.graindex2:,w] * (grains**-1.5) * radii1[r] * ca[r]
+                flux *= self.emis['DirtyIceAstroSil'][self.graindex2:,w] * \
+                    (grains**-1.5) * radii1[r] * ca[r]
                 fr[r] = integrate.simps(flux, grains)
             fw[w] = integrate.simps(fr, radii1)
         return fw*1.649407760419599e-07/(self.starD**2)

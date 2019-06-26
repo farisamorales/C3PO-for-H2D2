@@ -23,6 +23,7 @@ for name in names:
 starNames = starNames[1:]
 starNames = ['HD 106252']
 starNames = ['HD 204961', 'HD 105211', 'HD 106252']
+starNames = ['GJ 285', 'BD-19 1062']
 
 
 # Set the upper and lower bounds for the fitting
@@ -59,7 +60,9 @@ showMinGrain = 1
 # Show the IRS variance on the plot
 showIRSVariance = 0
 # Show the normalized belts
-showNormedBelts = 0
+showNormedBelts = 1
+# Show the flux ratios of the coldbelt/star and warmbelt/star
+showFluxRatios = 0 # Later use convolution for F_24 and F_70?
 
 # Fitting routines (only 1 can be active at once):
 # One warm belt with a wandering grain size and one fixed grain size cold belt:

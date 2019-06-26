@@ -32,7 +32,7 @@ def run_fits(starName):
     # Grain compositions. This directly impacts the files that are loaded.
     innerGrain = 'AstroSil'
     outerGrain = 'DirtyIceAstroSil'
-    
+
     # Grain densities. Important for calculating the blowout size of the grains.
     densities = {
         # For the density of the grains:
@@ -196,7 +196,7 @@ def run_fits(starName):
             fitError = np.append(fitError, sData[inst][er])
 
     # Remove any UL data points
-    ind = np.where((fitWaves/fitFlux) < 3)
+    ind = np.where( (fitWaves/fitFlux) < 3 )
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
     fitError = fitError[ind]
@@ -390,10 +390,10 @@ def run_fits(starName):
     if showNormedBelts:
         # Show the normalized belts with observed flux and stellar model
         fig = plt.figure(figsize=(8, 6))
+        plt.plot(ngWave, ngFnu, label='Stellar Model', color='g')
         plt.plot(fitWaves, n_1*bb1, label='Warm Belt')
         plt.plot(fitWaves, n_2*bb2, label='Cold Belt')
         plt.scatter(fitWaves, fitFlux, label='Observed Data')
-        plt.plot(ngWave, ngFnu, label='Stellar Model')
         plt.xlim(1, 300)
         plt.ylim(n_1*bb1.max()*0.1, n_2*bb2.max()*100 )
         plt.title(starName+': for seeing the normalized belts', fontsize=22)
