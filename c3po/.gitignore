@@ -1,4 +1,2 @@
 # Ignore models that are still in development
-bound_options.py
-fitting_options.py
 !.gitignore

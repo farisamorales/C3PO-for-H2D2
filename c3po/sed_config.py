@@ -145,9 +145,9 @@ def b_lam(wavelengths, temperature):
 # Calculate the minimum blowout size given stellar properties
 def blowout_size(grainDensity, starL=1., starM=1., qRad=0.9):
     # Calculate blowout grain size
-    grainDensity = grainDensity / 1000 / (0.01**3) # Density converted to SI
+    density = grainDensity / 1000 / (0.01**3) # Density converted to SI
     nume = 3 * starL * 3.826e26 * qRad
-    deno = 8 * np.pi*starM* 1.989e30 *constants.G*constants.c*grainDensity
+    deno = 8 * np.pi*starM* 1.989e30 *constants.G*constants.c*density
     return nume/deno * 1e6 # microns
 
 # Separates data according to instrument. Input: dict of IPAC Tables
@@ -168,43 +168,11 @@ def sort_by_instrument(data):
         separatedStarData[inst][er] = np.array(data[er][index])
     return unique_insts, separatedStarData
 
-# Create 1000 radii arrays for given star temp. Used in realistic fitting.
-# Takes dictionary of grain temps and list of grain comps.
-def interpTemps(starTemp, oldGrainTemps, grainComps):
-    STAR_TEMPS = np.linspace(2000, 15000, 14)
-    DISK_RADII = np.logspace(-1, 3, 121)
-    radii = np.logspace(-1, 3, 1000)
-    GRAINSIZES = np.loadtxt(ARR_DIR+'GrainSizes.dat')
-    for grainComp in grainComps:
-        abr = ''
-        for letter in grainComp:
-            if letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ':
-                abr += letter
-        starIndices = np.where(np.logical_and(
-            STAR_TEMPS<starTemp+3000,
-            STAR_TEMPS>starTemp-3000
-            ))
-        newStarTempGrainTemps = np.empty((
-            DISK_RADII.size,
-            GRAINSIZES.size
-            ))
-        for r in range(DISK_RADII.size):
-            for g in range(GRAINSIZES.size):
-                newStarTempGrainTemps[r][g] = np.interp(
-                    starTemp,
-                    STAR_TEMPS[starIndices],
-                    oldGrainTemps[grainComp][starIndices][:,r][:,g]
-                    )
-        newGrainTemps = np.empty((radii.size,GRAINSIZES.size))
-        for r  in range(radii.size):
-            for g in range(GRAINSIZES.size):
-                newGrainTemps[r][g] = np.interp(
-                    radii[r],
-                    DISK_RADII,
-                    newStarTempGrainTemps[:,g]
-                    )
-        np.save(ARR_DIR+'InterpGrainTemps/'+'%.0fK_%s.npy'%
-            (starTemp,grainComp), newGrainTemps, allow_pickle=False)
+def lum_ratio(starFlux, dustFlux, waves):
+    l_dust = integrate.simps(dustFlux, waves)
+    l_star = integrate.simps(starFlux, waves)
+    return l_dust/l_star
+
 
 # Star object handles all of the flux calculations
 class Star:
@@ -221,10 +189,25 @@ class Star:
         self.graindex1 = graindex1
         self.graindex2 = graindex2
         self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
+        self.sigma = 0.1
 
-    def calcFluxWarmMinGrains(self, waves, r0, bos, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+    def calcDustMass(self,  n_dust, r_0, a_min, a_max, density, func):
+        '''
+        Still a work in progress. Does not work properly yet.
+        '''
+        r0 = r_0 *1.4959787066e11
+        rindex = np.where(np.logical_and(self.radii<1.4*r0,
+            self.radii>0.6*r0))[0]
+        radii1 = self.radii[rindex]
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
+        asdf = np.exp(exponent) * radii1
+        money = integrate.simps(asdf, radii1)
+        dust_mass = (8.0/3.0) * (density*1e3) * n_dust #(self.starD*3.086e16)**2*n_dust
+        dust_mass *= np.sqrt(a_min*a_max) * money
+        return dust_mass/1e26
+
+    def calcFluxWarmMinGrains(self, waves, r_0, bos, T_0=1):
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -233,7 +216,7 @@ class Star:
         grains = GRAINSIZES[graindex:self.graindex1]/1.0e6
         bos /= 1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(self.blowoutSize1,3+q)))
         ca *= 1e6
@@ -253,9 +236,8 @@ class Star:
             self.radii[rindex], axis=0)
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxBoSWarm(self, waves, r0, bos, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+    def calcFluxBoSWarm(self, waves, r_0,bos, T_0=1):
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -264,7 +246,7 @@ class Star:
         grains = GRAINSIZES[graindex:]/1.0e6
         bos /= 1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
@@ -287,9 +269,8 @@ class Star:
         # computation is faster if we just skip to this.
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxBoSCold(self, waves, r0, bos, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+    def calcFluxBoSCold(self, waves, r_0,bos, T_0=1):
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -298,7 +279,7 @@ class Star:
         grains = GRAINSIZES[graindex:]/1.0e6
         bos /= 1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
@@ -321,9 +302,8 @@ class Star:
         # computation is faster if we just skip to this.
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxWarm(self, waves, r0, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+    def calcFluxWarm(self, waves, r_0,T_0=1):
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -331,7 +311,7 @@ class Star:
         grains = GRAINSIZES[self.graindex1:]/1.0e6
         bos = self.blowoutSize1/1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
         ca1 = np.reshape(ca, (1, ca.size, 1))
@@ -350,9 +330,8 @@ class Star:
             self.radii[rindex], axis=0)
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def calcFluxCold(self, waves, r0, T_0=1):
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+    def calcFluxCold(self, waves, r_0,T_0=1):
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -360,7 +339,7 @@ class Star:
         grains = self.grains[self.graindex2:]/1.0e6
         bos = self.blowoutSize2/1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
 
@@ -381,12 +360,11 @@ class Star:
             self.radii[rindex], axis=0)
         return f*1.649407760419599e-07/(self.starD**2)
 
-    def deprecated_calcFluxCold(self, waves, r0, T_0 = 1):
+    def deprecated_calcFluxCold(self, waves, r_0,T_0 = 1):
         '''
         This is kept for use as a comparison to the new algorithm.
         '''
-        sigma = 0.10
-        r0 *= 1.4959787066e11
+        r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
@@ -394,7 +372,7 @@ class Star:
         grains = self.grains[self.graindex2:]/1.0e6
         bos = self.blowoutSize2/1e6
         q = -3.5
-        exponent = -0.5 * ((radii1 - r0) / (sigma*r0))**2
+        exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)*np.abs(3+q) \
             / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
 

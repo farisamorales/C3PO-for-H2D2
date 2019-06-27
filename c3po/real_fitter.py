@@ -14,10 +14,9 @@ from fitting_options import *
 def run_fits(starName):
     # Convenience variables
     wa, fx, er, kw, va = 'wavelength', 'flux', 'error', 'keywords', 'value'
-
     # Compositions of the grains.
     grainComps = ['AstroSil', 'DirtyIceAstroSil']
-
+    lunar_mass = 7.34767309e22 # kg
     # Instrument names
     mj, mh, mk      = '2MASSJ', '2MASSH', '2MASSK'
     w1, w2, w3, w4  = 'WISE1', 'WISE2', 'WISE3', 'WISE4'
@@ -28,11 +27,9 @@ def run_fits(starName):
     h160ul          = 'HerschelPACS160UL'
     sl2, sl1        = 'SpitzerIRS-SL2', 'SpitzerIRS-SL1'
     ll2, ll1        = 'SpitzerIRS-LL2', 'SpitzerIRS-LL1'
-
     # Grain compositions. This directly impacts the files that are loaded.
     innerGrain = 'AstroSil'
     outerGrain = 'DirtyIceAstroSil'
-
     # Grain densities. Important for calculating the blowout size of the grains.
     densities = {
         # For the density of the grains:
@@ -49,22 +46,18 @@ def run_fits(starName):
         # 'AstroSil': 3.0,           # Correlates to DIAS -> 2.034 g/cm^3
         # 'DirtyIceAstroSil': 2.034, # Correlates to AS -> 3.0 g/cm^3
         }
-
     # Read in the star file
     starData = ascii.read(sed_config.STAR_FILES+'{}_stitched.txt'.format(starName))
-
     # Read in the stellar properties
     starT    = starData.meta[kw]['TEMP'][va]    # Stellar Temperature
     starL    = starData.meta[kw]['starL'][va]   # Stellar Luminosity
     starM    = starData.meta[kw]['starM'][va]   # Stellar Mass
     specType = starData.meta[kw]['SpType'][va]  # Spectral Type
     starD    = starData.meta[kw]['DIST_pc'][va] # Distance to Earth
-
     # Fillers for in case the data is missing.
     starL = 1 if np.isnan(starL) else starL
     starM = 1 if np.isnan(starM) else starM
     starD = 1 if np.isnan(starD) else starD
-
     # Concerning the nextgen and kurucz models: the wavelengths are in units of
     # angstrom, which equals 10^-10 meters. Flux is in erg/cm^2/s/a.
     # Create temp array that matches the temperatures of the nextgen stellar
@@ -74,20 +67,16 @@ def run_fits(starName):
     ngTemps    = np.append(ngTemps, np.arange(4200, 10200, 200))
     TEMP       = sed_config.find_nearest(ngTemps, starT)
     ngfilename = 'xp00_'+str(TEMP)+'g40.txt'
-
     # Temperature label for the graph of the SED fit
     starLabel = TEMP
-
     # Load the nextgen stellar model
     ngWave, ngFlux   = np.loadtxt(sed_config.NEXTGEN+ngfilename, unpack=True)
     ngWave, ngwIndex = np.unique(ngWave, return_index=True)
     ngFlux           = ngFlux[ngwIndex]
-
     # Convert the nextgen model to janskies
     c_cgs  = 2.99792458e10                          #cm/s
     ngFnu  = ngFlux*(ngWave**2)/c_cgs/1.0e8*1.0e23  #Jy
     ngWave = ngWave*1.0e-4                          #cm -> um
-
     if TEMP > 10000:
         # Load kurucz model
         kzTemps = np.arange(3500, 10000, 250)
@@ -96,12 +85,10 @@ def run_fits(starName):
         kzTemps = np.append(kzTemps, np.arange(35000, 52500, 2500))
         kzTemp = find_nearest(kzTemps, starT)
         starLabel = kzTemp
-
         kzfilename = 'kp00_'+str(kzTemp)+'g40.txt'
         kzWave, kzFlux = np.loadtxt(sed_config.KURUCZ+kzfilename, unpack=True)
         kzWave, kzwIndex = np.unique(kzWave, return_index=True)
         kzFlux = kzFlux[kzwIndex]
-
         # Convert the kurucz model to janskies
         c_cgs = 2.99792458e10                          #cm/s
         kzFnu = kzFlux*(kzWave**2)/c_cgs/1.0e8*1.0e23  #Jy
@@ -109,22 +96,18 @@ def run_fits(starName):
         index = np.where(kzWave < 2.154)
         kzFnu = kzFnu[index]
         kzWave = kzWave[index]
-
         index = np.where(ngWave >= 2.154)
         ngFnu = ngFnu[index]
         ngWave = ngWave[index]
-
         s_norm = np.nanmean(kzFnu[-5:])/np.nanmean(ngFnu[:5])
         ngFnu *= s_norm
-
-        ngWave = np.array(list(kzWave)+list(ngWave))
-        ngFnu = np.array(list(kzFnu)+list(ngFnu))
+        ngWave = np.append(kzWave, ngWave)
+        ngFnu = np.append(kzFnu, ngFnu)
 
     # Log all instruments and sort data by instrument. sData is a dictionary,
     # the keys of which are the instrument names. Within that are the fluxes,
     # the wavelengths, and errors.
     insts, sData = sed_config.sort_by_instrument(starData)
-
     # Boolean flags used to simplify accounting for which modules are present
     # in the data
     mjf, mhf, mkf    = mj in insts, mh in insts, mk in insts
@@ -178,6 +161,7 @@ def run_fits(starName):
     fitWaves = np.array([])
     fitFlux = np.array([])
     fitError = np.array([])
+    fitInsts = []
     if totalInsts:
         for inst in totalInsts:
             if saturation_limits:
@@ -185,31 +169,39 @@ def run_fits(starName):
                 fitWaves = np.append(fitWaves, sData[inst][wa][ind])
                 fitFlux  = np.append(fitFlux, sData[inst][fx][ind])
                 fitError = np.append(fitError, sData[inst][er][ind])
+                fitInsts.append(inst)
             else:
                 fitWaves = np.append(fitWaves, sData[inst][wa])
                 fitFlux  = np.append(fitFlux, sData[inst][fx])
                 fitError = np.append(fitError, sData[inst][er])
+                fitInsts.append(inst)
+                # print(inst)
     if ulInsts:
         for inst in ulInsts:
             fitWaves = np.append(fitWaves, sData[inst][wa])
             fitFlux  = np.append(fitFlux, sData[inst][fx])
             fitError = np.append(fitError, sData[inst][er])
+            fitInsts.append(inst)
 
+    fitInsts = np.array(fitInsts, dtype=str)
     # Remove any UL data points
-    ind = np.where( (fitWaves/fitFlux) < 3 )
+    ind = np.where( (fitFlux/fitError) > 3 )
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
     fitError = fitError[ind]
+    fitInsts = fitInsts[ind]
 
     # Remove any NaN data points (UL)
     ind = np.isfinite(fitFlux)
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
     fitError = fitError[ind]
+    fitInsts = fitInsts[ind]
     ind = np.isfinite(fitError)
     fitWaves = fitWaves[ind]
     fitFlux = fitFlux[ind]
     fitError = fitError[ind]
+    fitInsts = fitInsts[ind]
 
     # Create arrays for the stitched data
     if spitzInsts:
@@ -220,6 +212,7 @@ def run_fits(starName):
             spitzWaves = np.append(spitzWaves, sData[ins][wa])
             spitzFlux  = np.append(spitzFlux, sData[ins][fx])
             spitzError = np.append(spitzError, sData[ins][er])
+            fitInsts = np.append(fitInsts, ins)
 
     # Do convolving if there's MIPS24 data and IRS
     if mp24f and len(spitzInsts) > 0:
@@ -244,6 +237,17 @@ def run_fits(starName):
     fitWaves = fitWaves[ind]
     fitFlux  = fitFlux[ind]
     fitError = fitError[ind]
+    # fitInsts = fitInsts[ind]
+
+
+    # print(fitWaves)
+    # print()
+    # print(fitFlux)
+    # print()
+    # print(fitError)
+    # print()
+    # print(fitInsts)
+    # quit()
 
     # Normalize stellar model from either SL2 or 2MASSK data.
     if sl2f:
@@ -416,9 +420,9 @@ def run_fits(starName):
             + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit
     # option: oneWander
-    def oneWarmWander(waves, r0warm, r0cold, bos, n1, n2, n3):
+    def oneWarmWander(waves, r0warm, r0cold, bos1, n1, n2, n3):
         ''' one warm belt with a wandering blowout grain size, one cold belt '''
-        return n1*star1.calcFluxBoSWarm(waves, r0warm, bos) \
+        return n1*star1.calcFluxBoSWarm(waves, r0warm, bos1) \
             + n2*star1.calcFluxCold(waves, r0cold) \
             + n3*ngFnu_fit
     # option: twoWander
@@ -454,7 +458,7 @@ def run_fits(starName):
     else:
         p0bos2 = blowoutSize2
     if oneWander:
-        # parameters: r0warm, r0cold, bos, n1, n2, n3
+        # parameters: r0warm, r0cold, bos1, n1, n2, n3
         if useSpatialRadii and sTrigger:
             lBounds = [0.3, bbr2-bbr2_unc, 1e-3,
                     n_1/beltBound, n_2/beltBound, n_3*0.8]
@@ -555,7 +559,7 @@ def run_fits(starName):
 
     # Unpack the parameters and print them to the terminal for the user
     if oneWander:
-        RW, RC, bos, n1, n2, n3 = popt
+        RW, RC, bos1, n1, n2, n3 = popt
         with open(PARAMS_DIR + f"{starName}.txt", 'w+') as f:
             f.write(f"Warm radius: {RW}\n"
                     f"Cold radius: {RC}\n"
@@ -610,7 +614,7 @@ def run_fits(starName):
     print( '          Cold norm: %.16f' % n2 )
     print( '       Stellar norm: %.2f' % n3 )
     if oneWander:
-        print( '      BlowoutSize: %.2f' % bos )
+        print( '      BlowoutSize: %.2f' % bos1 )
         print( f"Warm Blowoutsize Scalar Multiple: {bosScalar1}\n"
                f"Cold Blowoutsize Scalar Multiple: {bosScalar2}\n")
     elif twoWander:
@@ -626,7 +630,7 @@ def run_fits(starName):
 
     # Calculate chi square value
     if oneWander:
-        resid = (fitFlux-oneWarmWander(fitWaves, RW, RC, bos, n1, n2, n3))/fitError
+        resid = (fitFlux-oneWarmWander(fitWaves, RW, RC, bos1, n1, n2, n3))/fitError
         degsFreedom = fitWaves.size - 6
     elif twoWander:
         resid = (fitFlux-warmColdWander(fitWaves, RW, RC, bos1, bos2, n1, n2, n3))/fitError
@@ -662,26 +666,174 @@ def run_fits(starName):
     # Calculate the high resolution totalFlux array given the optimized
     # parameters
     if oneWander:
-        y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos)
+        y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos1)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
-        totalFlux = y1 + y2 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
+        ngModel = np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
+        totalFlux = y1 + y2 + ngModel
+
     elif twoWander:
         y1 = n1 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos1)
         y2 = n2 * star2.calcFluxBoSCold(sed_config.WAVELENGTHS, RC, bos2)
-        totalFlux = y1 + y2 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
+        ngModel = np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
+        totalFlux = y1 + y2 + ngModel
     elif noWander:
         y1 = n1 * star2.calcFluxWarm(sed_config.WAVELENGTHS, RW)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
-        totalFlux = y1 + y2 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
+        ngModel = np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
+        totalFlux = y1 + y2 + ngModel
     elif twoWarmBelts:
         y1 = n1 * star2.calcFluxWarm(sed_config.WAVELENGTHS, RW)
         y2 = n2 * star2.calcFluxCold(sed_config.WAVELENGTHS, RC)
         y3 = n4 * star2.calcFluxBoSWarm(sed_config.WAVELENGTHS, RW, bos1)
-        totalFlux = y1 + y2 + y3 + np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
+        ngModel = np.e**np.interp(np.log(sed_config.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
+        totalFlux = y1 + y2 + y3 + ngModel
+
+    if oneWander or twoWander or noWander:
+        l_warm = sed_config.lum_ratio(ngModel, y1, sed_config.WAVELENGTHS)
+        l_cold = sed_config.lum_ratio(ngModel, y2, sed_config.WAVELENGTHS)
+    elif twoWarmBelts:
+        l_warm_big = sed_config.lum_ratio(ngModel, y1,
+            sed_config.WAVELENGTHS)
+        l_warm_small = sed_config.lum_ratio(ngModel, y3,
+            sed_config.WAVELENGTHS)
+        l_cold = sed_config.lum_ratio(ngModel, y2,
+            sed_config.WAVELENGTHS)
+
+    if showDustMass:
+        if oneWander:
+            warm_dust_mass = star2.calcDustMass(
+                n1, RW, bos1*1e-6, 1e-3, densities[innerGrain])
+            cold_dust_mass = star2.calcDustMass(
+                n1, RC, blowoutSize2*1e-6, 1e-3, densities[outerGrain])
+            print(f"Warm dust mass: {warm_dust_mass/lunar_mass} lunar masses")
+            print(f"Cold dust mass: {cold_dust_mass/lunar_mass} lunar masses")
+        elif twoWander:
+            warm_dust_mass = star2.calcDustMass(
+                n1, RW, bos1*1e-6, 1e-3, densities[innerGrain])
+            cold_dust_mass = star2.calcDustMass(
+                n1, RC, bos2*1e-6, 1e-3, densities[outerGrain])
+            print(f"Warm dust mass: {warm_dust_mass/lunar_mass} lunar masses")
+            print(f"Cold dust mass: {cold_dust_mass/lunar_mass} lunar masses")
+        elif noWander:
+            warm_dust_mass = star2.calcDustMass(
+                n1, RC, blowoutSize1*1e-6, 1e-3, densities[innerGrain])
+            cold_dust_mass = star2.calcDustMass(
+                n1, RC, blowoutSize2*1e-6, 1e-3, densities[outerGrain])
+            print(f"Warm dust mass: {warm_dust_mass/lunar_mass} lunar masses")
+            print(f"Cold dust mass: {cold_dust_mass/lunar_mass} lunar masses")
+        elif twoWarmBelts:
+            warm_dust_mass = star2.calcDustMass(
+                n1, RW, blowoutSize1*1e-6, 1e-3, densities[innerGrain])
+            cold_dust_mass = star2.calcDustMass(
+                n1, RC, blowoutSize2*1e-6, 1e-3, densities[outerGrain])
+            small_warm_dust_mass = star2.calcDustMass(
+                n1, RW, bos1*1e-6, blowoutSize1*1e-6, densities[innerGrain])
+            print(f"Warm dust mass: {warm_dust_mass/lunar_mass} lunar masses")
+            print(f"Cold dust mass: {cold_dust_mass/lunar_mass} lunar masses")
+            print(f"Warm small grain dust mass: "
+                  f"{small_warm_dust_mass/lunar_mass} lunar masses")
+
+    if showLumRatios:
+        if oneWander or twoWander or noWander:
+            print(f"L_dust_warm/L_star: {l_warm}")
+            print(f"L_dust_cold/L_star: {l_cold}")
+        elif twoWarmbelts:
+            print(f"L_dust_warm_large_grains/L_star: {l_warm_big}")
+            print(f"L_dust_warm_small_grains/L_star: {l_warm_small}")
+            print(f"L_dust_cold/L_star: {l_cold}")
+
+    if showFluxRatios:
+        if oneWander or twoWander or noWander:
+            # HerschelPACS70
+            h70w, h70r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-blue-70.dat', unpack=True)
+            f70_warmdust = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, y1)
+            f70_colddust = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, y2)
+            f70_star = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 70 microns filter ---")
+            print(f"f_warm/f_star : {f70_warmdust/f70_star}")
+            print(f"f_cold/f_star : {f70_colddust/f70_star}")
+            # HerschelPACS100
+            h100w, h100r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-green-100.dat', unpack=True)
+            f100_warmdust = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, y1)
+            f100_colddust = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, y2)
+            f100_star = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 100 microns filter ---")
+            print(f"f_warm/f_star : {f100_warmdust/f100_star}")
+            print(f"f_cold/f_star : {f100_colddust/f100_star}")
+            # HerschelPACS160
+            h160w, h160r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-red-160.dat', unpack=True)
+            f160_warmdust = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, y1)
+            f160_colddust = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, y2)
+            f160_star = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 160 microns filter ---")
+            print(f"f_warm/f_star : {f160_warmdust/f160_star}")
+            print(f"f_cold/f_star : {f160_colddust/f160_star}")
+        elif twoWarmbelts:
+            # HerschelPACS70
+            h70w, h70r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-blue-70.dat', unpack=True)
+            f70_warmdust = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, y1)
+            f70_colddust = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, y2)
+            f70_warmdustsmall = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, y3)
+            f70_star = sed_config.convolve(
+                h70w, h70r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 70 microns filter ---")
+            print(f"f_warm/f_star : {f70_warmdust/f70_star}")
+            print(f"f_cold/f_star : {f70_colddust/f70_star}")
+            print(f"small grains f_warm/f_star : "
+                  f"{f70_warmdustsmall/f70_star}")
+            # HerschelPACS100
+            h100w, h100r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-green-100.dat', unpack=True)
+            f100_warmdust = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, y1)
+            f100_warmdustsmall = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, y3)
+            f100_colddust = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, y2)
+            f100_star = sed_config.convolve(
+                h100w, h100r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 100 microns filter ---")
+            print(f"f_warm/f_star : {f100_warmdust/f100_star}")
+            print(f"f_cold/f_star : {f100_colddust/f100_star}")
+            print(f"small grains f_warm/f_star : "
+                  f"{f100_warmdustsmall/f100_star}")
+            # HerschelPACS160
+            h160w, h160r = np.loadtxt(
+                sed_config.FILTERS_DIR + 'pacs-red-160.dat', unpack=True)
+            f160_warmdust = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, y1)
+            f160_warmdustsmall = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, y3)
+            f160_colddust = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, y2)
+            f160_star = sed_config.convolve(
+                h160w, h160r, sed_config.WAVELENGTHS, ngModel)
+            print("--- Herschel 160 microns filter ---")
+            print(f"f_warm/f_star : {f160_warmdust/f160_star}")
+            print(f"f_cold/f_star : {f160_colddust/f160_star}")
+            print(f"small grains f_warm/f_star : "
+                  f"{f160_warmdustsmall/f160_star}")
+
 
     # Plot realistic grain fluxes
     if oneWander:
@@ -778,7 +930,7 @@ def run_fits(starName):
     # Show the minimum grain size
     if showMinGrain and sTrigger:
         if oneWander:
-            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bos: 0.4f} {chr(956)}m",
+            plt.text(0.98, 0.86, f"a{r'$_{min}$'}: {bos1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif twoWander:
             plt.text(0.98, 0.86, f"inner a{r'$_{min}$'}: {bos1: 0.4f}",
@@ -803,7 +955,7 @@ def run_fits(starName):
                 ha = 'right', va = 'top', transform = ax.transAxes)
     elif showMinGrain and not sTrigger:
         if oneWander:
-            plt.text(0.98, 0.92, f"a{r'$_{min}$'}: {bos: 0.4f} {chr(956)}m",
+            plt.text(0.98, 0.92, f"a{r'$_{min}$'}: {bos1: 0.4f} {chr(956)}m",
                 ha = 'right', va = 'top', transform = ax.transAxes)
         elif twoWander:
             plt.text(0.98, 0.92, f"inner a{r'$_{min}$'}: {bos1: 0.4f}",
