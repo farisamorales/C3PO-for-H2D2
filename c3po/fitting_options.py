@@ -5,7 +5,7 @@ pull any updates to their machine.
 '''
 
 import os
-import sed_config
+import sed_config as sconf
 
 # Grab star names
 starNames = []
@@ -15,18 +15,18 @@ for name in names:
     name = name.strip()
     starNames.append(name)
 
-
 ################################################################################
 #                               Begin Options
 ################################################################################
-
-starNames = starNames[1:]
+# starNames = starNames[41:]
 # starNames = ['HD 106252']
 # starNames = ['HD 204961', 'HD 105211', 'HD 106252']
 # starNames = ['GJ 285', 'BD-19 1062']
-starNames = ['HD 105']
-starNames = ['HD 71722']
+# starNames = ['HD 105']
+# starNames = ['HD 71722']
 # starNames = ['HD 115600']
+# starNames = ['HD 166', 'HD 10939', 'HD 71722']
+# starNames = ['HD 15115']
 
 # Set the upper and lower bounds for the fitting
 # Upper bound for the cold belt radius:
@@ -45,16 +45,18 @@ bosScalar1 = 1
 # Scalar multiplier for the cold belt minimum blowout size
 bosScalar2 = 1
 
+
 # Toggle plots showing after each fit:
 showFigure = 1
 # Toggle plots saving into their respective directories after each fit:
 saveFigure = 0
-# Toggle save into a results table (not complete yet):
+# Toggle save into a results table
 saveResults = 0
 # Toggle discarding measurements beyond the saturation limit:
 saturation_limits = 0
 # Toggle using the resolved radii for the cold belt initial guess & bounds
 useSpatialRadii = 1
+
 # Show the resolved radius on the plot:
 showResolved = 1
 # Show the minimum blow out size on the plot:
@@ -74,33 +76,33 @@ showDustMass = 0
 # One warm belt with a wandering grain size and one fixed grain size cold belt:
 oneWander = 0
 # One warm belt and one cold belt, both with wandering grain sizes:
-twoWander = 1
+twoWander = 0
 # One warm belt and one cold belt (fixed blowout size):
 noWander = 0
 # Two co-located warm belts (one wandering & one fixed) and one fixed cold belt:
-twoWarmBelts = 0
+twoWarmBelts = 1
 
+# Use AllSky or AllWise. You can only select ONE at a time. Or neither.
+useAllSky = 0
+useAllWise = 0
 
 ################################################################################
 #                                 End Options
 ################################################################################
-
-
-
-
-
-# Load the spatially resolved radii as seen by Herschel
-spatialRadii = sed_config.load_spatial_radii()
-
+# Set the proper directories
 if oneWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Warm Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Warm Wander/".split('/'))
+    IMG_DIR     = sconf.PLOTS_DIR + os.sep.join("Warm Wander/".split('/'))
+    PARAMS_DIR  = sconf.PARAMS_DIR + os.sep.join("Warm Wander/".split('/'))
+    FRATIOS_DIR = sconf.FRATIOS_DIR + os.sep.join("Warm Wander/".split('/'))
 elif twoWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Both Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Both Wander/".split('/'))
+    IMG_DIR     = sconf.PLOTS_DIR + os.sep.join("Both Wander/".split('/'))
+    PARAMS_DIR  = sconf.PARAMS_DIR + os.sep.join("Both Wander/".split('/'))
+    FRATIOS_DIR = sconf.FRATIOS_DIR + os.sep.join("Both Wander/".split('/'))
 elif noWander:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/No Wander/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/No Wander/".split('/'))
+    IMG_DIR     = sconf.PLOTS_DIR + os.sep.join("No Wander/".split('/'))
+    PARAMS_DIR  = sconf.PARAMS_DIR + os.sep.join("No Wander/".split('/'))
+    FRATIOS_DIR = sconf.FRATIOS_DIR + os.sep.join("No Wander/".split('/'))
 elif twoWarmBelts:
-    IMG_DIR = sed_config.RES_DIR + os.sep.join("Plots/Two Warm Belts/".split('/'))
-    PARAMS_DIR = sed_config.RES_DIR + os.sep.join("Params/Two Warm Belts/".split('/'))
+    IMG_DIR     = sconf.PLOTS_DIR + os.sep.join("Two Warm Belts/".split('/'))
+    PARAMS_DIR  = sconf.PARAMS_DIR + os.sep.join("Two Warm Belts/".split('/'))
+    FRATIOS_DIR = sconf.FRATIOS_DIR + os.sep.join("Two Warm Belts/".split('/'))

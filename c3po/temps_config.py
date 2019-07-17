@@ -1,121 +1,71 @@
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy import integrate
 from scipy import constants
-import sed_config
+import sed_config as sconf
 
-
-def energin(waves, emis, star_t, star_l):
+def energin(star_t, star_l, grainComp):
     '''
     Calculate the energy entering the grain coming from the star.
         Returns shape:
-            (N_radial_locations, N_grainsizes)
+            (N_radii, N_grains) ~ (1000, 121)
     '''
-    # Convert to appropriate units
-    waves_m = waves/1e6              # um -> m
-    radii = np.logspace(-1, 3, 1000) * 1.4959787066e11 # AU -> m
-
-    # Calculate stellar radius from luminosity/temp
+    radii = sconf.TEMPS_RADII * 1.4959787066e11 # AU -> m
     star_r = np.sqrt(star_l*3.828e26/4/np.pi/constants.sigma/(star_t**4))
+    f = sconf.b_lam(sconf.WAVELENGTHS, star_t) * sconf.EMISSIVITIES_TOTAL[grainComp]
+    e_in = integrate.simps(f, sconf.WAVELENGTHS/1e6)
+    return (star_r/radii[:, np.newaxis])**2 * e_in
 
-    # Calculate flux wrt wavelength (one per grainsize)
-    f = sed_config.b_lam(waves, star_t) * emis
-    flux = integrate.simps(f, waves_m)
-
-    # Calculate energy into each grain per radial location per frequency
-    grains = np.broadcast_to(sed_config.GRAINSIZES/1e6,
-        (radii.size, sed_config.GRAINSIZES.size))
-    radii = np.broadcast_to(radii, (1, radii.size)).T
-    return (star_r/radii)**2 * flux
-
-def energout(waves, emis, temps):
+def energout(temps, grainComp):
     '''
     Calculate the energy of dust grains at each radial location.
     Returns an array of shape:
-        (N_grainsizes, N_temps)
+        (N_grains, N_temps) ~ (121, arbitrarily 100)
     '''
-    # Convert units
-    waves_m = waves/1e6
+    emis = sconf.EMISSIVITIES_TOTAL[grainComp][:, np.newaxis, :]
+    f = sconf.b_lam(sconf.WAVELENGTHS, temps[:, np.newaxis]) * emis
+    e_out = integrate.simps(f, sconf.WAVELENGTHS/1e6) * 4
+    return e_out
 
-    # Broadcast/reshape arrays so that looping is done in C
-    temps1 = np.broadcast_to(temps, (1, temps.size)).T
-    emis1 = np.reshape(emis, (emis.shape[0], 1, emis.shape[1]))
-
-    # Calculate flux at every temp/wavelength
-    f = sed_config.b_lam(waves, temps1) * emis1
-    e_out = integrate.simps(f, waves_m) * 4
-    return np.broadcast_to(e_out, (1000, e_out.shape[0],
-        e_out.shape[1]))
-
-def interp_to_star(energy_in, energy_out, temps):
+def calc_temps(star_t, star_l, grainComp):
     '''
-    Returns shape:
-        (N_radial_locations, N_grainsizes)
+    Interpolate to the star temperature given the properties of the star and the
+    grain composition.
+    Returns an array of shape:
+        (N_radii, N_grains) ~ (1000, 121)
     '''
-    grainTemps = np.empty((energy_in.shape[0], energy_out.shape[1]))
-    for r in range(1000):
-        for a in range(sed_config.GRAINSIZES.size):
-            grainTemps[r, a] = np.interp(
-                    np.log(energy_in[r, a]),
-                    np.log(energy_out[r, a]),
-                    np.log(temps)
-                    )
-    return np.exp(grainTemps)
-
-def calcTemps(star_obj, grainComp):
-    '''
-    This is function that will be used in sed_config to calculate the grain
-    temps for each star IF the temps haven't been calculated already.
-    '''
-    star_t = star_obj.starT
-    star_l = star_obj.starL
-    emis = star_obj.emis[grainComp]
     temps = np.logspace(-1, 4, 100) # 0.1 - 10k
-    # Energy from star
-    energy_in = energin(sed_config.WAVELENGTHS, # um
-        emis, # scalar multiple
-        star_t, # Kelvin
-        star_l) # solar luminosities
-    # Energy that would come from each grain at these temps
-    energy_out = energout(sed_config.WAVELENGTHS,
-        sed_config.EMISSIVITIES_TOTAL['AstroSil'],
-        temps
-        )
-    gTemps = interp_to_star(energy_in, energy_out, temps)
-    return gTemps
-
+    energy_in = energin(star_t, star_l, grainComp)
+    energy_out = energout(temps, grainComp)
+    grainTemps = np.empty((sconf.TEMPS_RADII.size, sconf.GRAINSIZES.size))
+    for r in range(sconf.TEMPS_RADII.size):
+        for a in range(sconf.GRAINSIZES.size):
+            grainTemps[r, a] = np.interp(np.log(energy_in[r, a]),
+                np.log(energy_out[a]),np.log(temps))
+    return np.exp(grainTemps)
 
 if __name__ == '__main__':
     '''
     Test the functionality of the grain temps calculator. Shows plots of the
     grain temperatures vs grainsize and grain temperatures vs radial location.
     '''
-    temps = np.logspace(-1, 4, 100)
-    starT = 9750
-    # Energy from star
-    energy_in = energin(sed_config.WAVELENGTHS, # um
-        sed_config.EMISSIVITIES_TOTAL['AstroSil'], # scalar multiple
-        starT, # Kelvin
-        5) # solar luminosities
-    # print(energy_in.shape)
+    starT = 5800
+    starL = 1
+    grainComp = 'DirtyIceAstroSil'
+    gTemps = calc_temps(starT, starL, grainComp)
 
-    # Energy that would come from each grain at these temps
-    energy_out = energout(sed_config.WAVELENGTHS,
-        sed_config.EMISSIVITIES_TOTAL['AstroSil'],
-        temps
-        )
-    # print( energy_out.shape )
-
-    gTemps = interp_to_star(energy_in, energy_out, temps)
-
-    radii = np.logspace(-1, 3, 1000)
-
+    import matplotlib.pyplot as plt
     for i in range(10):
-        plt.loglog(sed_config.GRAINSIZES, gTemps[i*100], label=radii[i*100])
-    plt.legend()
+        plt.loglog(sconf.GRAINSIZES, gTemps[i*100], label=sconf.TEMPS_RADII[i*100])
+    plt.title('GrainTemps vs GrainSize')
+    plt.ylabel('GrainTemp (K)')
+    plt.xlabel('GrainSize (um)')
+    plt.legend(title='Radial Location (AU)')
     plt.show()
 
     for i in range(10):
-        plt.loglog(radii, gTemps[:, i*10], label=sed_config.GRAINSIZES[i*10])
-    plt.legend()
+        plt.loglog(sconf.TEMPS_RADII, gTemps[:, i*10], label=sconf.GRAINSIZES[i*10])
+    plt.title('GrainTemps vs Radii')
+    plt.ylabel('GrainTemps (K)')
+    plt.xlabel('Radii (AU)')
+    plt.legend(title='GrainSize (um)')
     plt.show()

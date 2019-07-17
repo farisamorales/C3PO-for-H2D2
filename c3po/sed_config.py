@@ -1,6 +1,7 @@
 # Functions for SED fitting
 import os
 import numpy as np
+import pandas as pd
 from scipy import integrate
 from scipy import constants
 from astropy.io import ascii
@@ -12,6 +13,9 @@ STAR_FILES  = os.sep.join('Data/StarFiles/'.split('/'))
 KURUCZ      = os.sep.join('Data/StellarModels/kurucz/'.split('/'))
 NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
 RES_DIR     = os.sep.join('Results/'.split('/'))
+PLOTS_DIR   = os.sep.join('Results/Plots/'.split('/'))
+PARAMS_DIR  = os.sep.join('Results/Params/'.split('/'))
+FRATIOS_DIR = os.sep.join('Results/FluxRatios/'.split('/'))
 INTERPS_DIR = os.sep.join('Data/Arrays/InterpGrainTemps/'.split('/'))
 FILTERS_DIR = os.sep.join('Data/FilterResponse/'.split('/'))
 GRAIN_TEMPS_DIR = os.sep.join('Data/GrainTemps/'.split('/'))
@@ -22,6 +26,7 @@ WAVELENGTHS = np.loadtxt(ARR_DIR + 'Wavelengths.dat')
 STAR_TEMPS = np.linspace(2000, 15000, 14)
 DISK_RADII = np.logspace(-1, 3, 121)
 WAVES = np.logspace(-3, 3, 1000)
+TEMPS_RADII = np.logspace(-1, 3, 1000)
 
 # Grain temperatures per grain composition
 # Deprecated soon?
@@ -45,18 +50,100 @@ def find_nearest_ind(array, value):
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return idx
+
 # Wrapper for the IPAC reader function
-def ascii_read(starFile):
+def read_star_file(starFile):
     '''
     Returns a dictionary with all of the comments included as keys
     '''
     x = ascii.read(starFile)
     data = {}
     for column in x.itercols():
-        data[column.name] = column
+        data[column.name] = np.array(column)
     for key in x.meta['keywords'].keys():
         data[key] = x.meta['keywords'][key]['value']
     return data
+
+def sort_spitz_data(starData):
+    # Sort Data: Pull SpitzerIRS
+    spindexes = np.concatenate((
+        np.nonzero('SpitzerIRS-SL2' == starData['instrument'])[0],
+        np.nonzero('SpitzerIRS-SL1' == starData['instrument'])[0],
+        np.nonzero('SpitzerIRS-LL2' == starData['instrument'])[0],
+        np.nonzero('SpitzerIRS-LL1' == starData['instrument'])[0]
+        ))
+    spitzWaves = starData['wavelength'][spindexes]
+    spitzFlux  = starData['flux'][spindexes]
+    spitzError = starData['error'][spindexes]
+    spitzInsts = starData['instrument'][spindexes]
+    allSpitz   = {'wavelength': spitzWaves, 'flux': spitzFlux,
+        'error': spitzError, 'instrument': spitzInsts}
+    # Sort Data: Pull all other Photometry Points
+    phindexes = np.nonzero(np.logical_and(
+        np.logical_and('SpitzerIRS-SL2' != starData['instrument'],
+            'SpitzerIRS-SL1' != starData['instrument']),
+        np.logical_and('SpitzerIRS-LL2' != starData['instrument'],
+            'SpitzerIRS-LL1' != starData['instrument'])
+        ))
+    totalWaves = starData['wavelength'][phindexes]
+    totalFlux  = starData['flux'][phindexes]
+    totalError = starData['error'][phindexes]
+    totalInsts = starData['instrument'][phindexes]
+    nonSpitz   = {'wavelength': totalWaves, 'flux': totalFlux,
+        'error': totalError, 'instrument': totalInsts}
+    return allSpitz, nonSpitz
+
+def sort_wise_data(starData):
+    # Separate the AllSky data
+    skindexes = np.concatenate((
+        np.nonzero('AllSkyW1' == starData['instrument'])[0],
+        np.nonzero('AllSkyW2' == starData['instrument'])[0],
+        np.nonzero('AllSkyW3' == starData['instrument'])[0],
+        np.nonzero('AllSkyW4' == starData['instrument'])[0]
+        ))
+    skyWaves = starData['wavelength'][skindexes]
+    skyFlux  = starData['flux'][skindexes]
+    skyError = starData['error'][skindexes]
+    skyInsts = starData['instrument'][skindexes]
+    allSky = {'wavelength': skyWaves, 'flux': skyFlux,
+        'error': skyError, 'instrument': skyInsts}
+    # Separate the AllWise data
+    windexes = np.concatenate((
+        np.nonzero('AllWiseW1' == starData['instrument'])[0],
+        np.nonzero('AllWiseW2' == starData['instrument'])[0],
+        np.nonzero('AllWiseW3' == starData['instrument'])[0],
+        np.nonzero('AllWiseW4' == starData['instrument'])[0]
+        ))
+    allWiseWaves = starData['wavelength'][windexes]
+    allWiseFlux  = starData['flux'][windexes]
+    allWiseError = starData['error'][windexes]
+    allWiseInsts = starData['instrument'][windexes]
+    allWise = {'instrument': allWiseWaves, 'flux': allWiseFlux,
+        'error': allWiseError, 'instrument': allWiseInsts}
+    remaindexes = np.nonzero(
+        np.logical_and(
+            np.logical_and(
+                np.logical_and('AllSkyW1' != starData['instrument'],
+                    'AllSkyW2' != starData['instrument']),
+                np.logical_and('AllSkyW3' != starData['instrument'],
+                    'AllSkyW4' != starData['instrument'])
+                ),
+            np.logical_and(
+                np.logical_and('AllWiseW1' != starData['instrument'],
+                    'AllWiseW2' != starData['instrument']),
+                np.logical_and('AllWiseW3' != starData['instrument'],
+                    'AllWiseW4' != starData['instrument'])
+                )
+            )
+        )
+    nonWiseWaves = starData['wavelength'][remaindexes]
+    nonWiseFlux  = starData['flux'][remaindexes]
+    nonWiseError = starData['error'][remaindexes]
+    nonWiseInsts = starData['instrument'][remaindexes]
+    nonWise = {'wavelength': nonWiseWaves, 'flux': nonWiseFlux,
+        'error': nonWiseError, 'instrument': nonWiseInsts}
+    return allSky, allWise, nonWise
+
 # Convolution function for calibrating data
 def convolve(filterwaves, filterresponse, datawaves, dataflux):
     top = integrate.simps(
@@ -65,24 +152,65 @@ def convolve(filterwaves, filterresponse, datawaves, dataflux):
     bottom = integrate.simps(filterresponse, filterwaves)
     return top/bottom
 
-# Load the radial locations as seen by Herschel
-def load_spatial_radii():
-    spatialRadii = []
-    rp_fname = os.sep.join('Data/spatialRadii.csv'.split('/'))
-    with open(rp_fname, 'r') as f:
-        text = f.readlines()
-    for te in text[1:]:
-        line = te.split(',')
-        radial_name = line[0].strip()
-        radial_hipname = line[1].strip()
-        radial_loc = line[2].strip()
-        radial_err = line[3].strip()
-        radial_loc = np.float64(radial_loc)
-        radial_err = np.float64(radial_err)
-        spatialRadii.append( [radial_name, radial_hipname, radial_loc, radial_err] )
-    return spatialRadii
+def load_stellar_model(starT):
+    # Concerning the nextgen and kurucz models: the wavelengths are in units of
+    # angstrom, which equals 10^-10 meters. Flux is in erg/cm^2/s/a.
+    # Create temp array that matches the temperatures of the nextgen stellar
+    # models. From 2600-4100, uses a step of 100. From 4200-10000, uses a step
+    # of 200. Grabs the nearest model to the star temp in the star file.
+    ngTemps    = np.arange(2600, 4100, 100)
+    ngTemps    = np.append(ngTemps, np.arange(4200, 10200, 200))
+    TEMP       = find_nearest(ngTemps, starT)
+    ngfilename = 'xp00_'+str(TEMP)+'g40.txt'
+    # Temperature label for the graph of the SED fit
+    starLabel = TEMP
+    # Load the nextgen stellar model
+    ngWave, ngFlux   = np.loadtxt(NEXTGEN+ngfilename, unpack=True)
+    ngWave, ngwIndex = np.unique(ngWave, return_index=True)
+    ngFlux           = ngFlux[ngwIndex]
+    # Convert the nextgen model to janskies
+    c_cgs  = 2.99792458e10                          #cm/s
+    ngFnu  = ngFlux*(ngWave**2) / c_cgs / 1.0e8 * 1.0e23  #Jy
+    ngWave = ngWave*1.0e-4                          #cm -> um
+    if TEMP > 10000:
+        # Load kurucz model
+        kzTemps = np.arange(3500, 10000, 250)
+        kzTemps = np.append(kzTemps, np.arange(10000, 13000, 500))
+        kzTemps = np.append(kzTemps, np.arange(13000, 35000, 1000))
+        kzTemps = np.append(kzTemps, np.arange(35000, 52500, 2500))
+        kzTemp = find_nearest(kzTemps, starT)
+        starLabel = kzTemp
+        kzfilename = 'kp00_'+str(kzTemp)+'g40.txt'
+        kzWave, kzFlux = np.loadtxt(KURUCZ+kzfilename, unpack=True)
+        kzWave, kzwIndex = np.unique(kzWave, return_index=True)
+        kzFlux = kzFlux[kzwIndex]
+        # Convert the kurucz model to janskies
+        c_cgs = 2.99792458e10                          #cm/s
+        kzFnu = kzFlux*(kzWave**2)/c_cgs/1.0e8*1.0e23  #Jy
+        kzWave = kzWave*1.0e-4                         #cm -> um
+        index = np.where(kzWave < 2.154)
+        kzFnu = kzFnu[index]
+        kzWave = kzWave[index]
+        index = np.where(ngWave >= 2.154)
+        ngFnu = ngFnu[index]
+        ngWave = ngWave[index]
+        s_norm = np.nanmean(kzFnu[-5:])/np.nanmean(ngFnu[:5])
+        ngFnu *= s_norm
+        ngWave = np.append(kzWave, ngWave)
+        ngFnu = np.append(kzFnu, ngFnu)
+    return ngWave, ngFnu, starLabel
 
-# Normalize the black body
+def calc_luminosity(ngWave, ngFnu, starD):
+    '''
+    Requires ngWave in microns, ngFnu in Jy, starD in parsecs.
+    Returns in units of solar luminosities
+    '''
+    absolute_lum = ngFnu/1e23 * 4. * np.pi * (starD*3.086e18)**2
+    absolute_lum = -integrate.simps(absolute_lum, (3e10/(ngWave/1e4)))
+    absolute_lum /= 3.828e33
+    return absolute_lum
+
+# Normalize a black body
 def norm_blackbodies(sData, fitWaves, nWarm, nCold, t_1, t_2):
     wa, fx = 'wavelength', 'flux'
     er = 'error'
@@ -132,6 +260,7 @@ def b_nu(wavelengths, temperature):
     bottom = C**2 * (np.exp(exponent) - 1)
     return top/bottom
 
+# Blackbody radiation function, in terms of wavelength
 def b_lam(wavelengths, temperature):
     H = constants.h
     C = constants.c
@@ -155,10 +284,7 @@ def sort_by_instrument(data):
     wa = 'wavelength'
     fx = 'flux'
     er = 'error'
-    unique_insts = list()
-    for i in range(data['instrument'].size):
-        if not data['instrument'][i] in unique_insts:
-            unique_insts.append(data['instrument'][i])
+    unique_insts = np.unique(data['instrument'])
     separatedStarData = dict()
     for inst in unique_insts:
         index = np.where(data['instrument']==inst)
@@ -169,10 +295,66 @@ def sort_by_instrument(data):
     return unique_insts, separatedStarData
 
 def lum_ratio(starFlux, dustFlux, waves):
-    l_dust = integrate.simps(dustFlux, waves)
-    l_star = integrate.simps(starFlux, waves)
+    l_dust = integrate.simps(dustFlux, (3e14/waves))
+    l_star = integrate.simps(starFlux, (3e14/waves))
     return l_dust/l_star
 
+def flux_ratios_herschel(y1, y2, ngModel, y3=None):
+    # Herschel frequency response functions
+    h70w, h70r = np.loadtxt(FILTERS_DIR+'pacs-blue-70.dat', unpack=True)
+    h100w, h100r = np.loadtxt(FILTERS_DIR+'pacs-green-100.dat', unpack=True)
+    h160w, h160r = np.loadtxt(FILTERS_DIR+'pacs-red-160.dat', unpack=True)
+    # Calculate flux ratios at 70 microns frf
+    fh70star  = convolve(h70w, h70r, WAVELENGTHS, ngModel)
+    fh70warm  = convolve(h70w, h70r, WAVELENGTHS, y1)/fh70star
+    fh70cold  = convolve(h70w, h70r, WAVELENGTHS, y2)/fh70star
+    # Calculate flux ratios at 100 microns frf
+    fh100star = convolve(h100w, h100r, WAVELENGTHS, ngModel)
+    fh100warm = convolve(h100w, h100r, WAVELENGTHS, y1)/fh100star
+    fh100cold = convolve(h100w, h100r, WAVELENGTHS, y2)/fh100star
+    # Calculate flux ratios at 160 microns frf
+    fh160star = convolve(h160w, h160r, WAVELENGTHS, ngModel)
+    fh160warm = convolve(h160w, h160r, WAVELENGTHS, y1)/fh160star
+    fh160cold = convolve(h160w, h160r, WAVELENGTHS, y2)/fh160star
+    if np.any(y3):
+        # y3 is only for fits with two co-located warm belts
+        fh70warmsmall   = convolve(h70w, h70r, WAVELENGTHS, y3)
+        fh70warmsmall  /= fh70star
+        fh100warmsmall  = convolve(h100w, h100r, WAVELENGTHS, y3)
+        fh100warmsmall /= fh100star
+        fh160warmsmall  = convolve(h160w, h160r, WAVELENGTHS, y3)
+        fh160warmsmall /= fh160star
+    else:
+        fh70warmsmall, fh100warmsmall, fh160warmsmall = np.nan, np.nan, np.nan
+    return (fh70warm, fh70cold,  fh100warm, fh100cold, fh160warm, fh160cold,
+        fh70warmsmall, fh100warmsmall, fh160warmsmall)
+
+def flux_ratios_mips(y1, y2, ngModel, y3=None):
+    # MIPS frequency response functions
+    m24w, m24r = np.loadtxt(FILTERS_DIR+'mips24_frf.txt', unpack=True)
+    m70w, m70r = np.loadtxt(FILTERS_DIR+'mips70_frf.txt', unpack=True)
+    m160w, m160r = np.loadtxt(FILTERS_DIR+'mips160_frf.txt', unpack=True)
+    # Calculate flux ratios at 24 microns frf
+    fm24star  = convolve(m24w, m24r, WAVELENGTHS, ngModel)
+    fm24warm  = convolve(m24w, m24r, WAVELENGTHS, y1)/fm24star
+    fm24cold  = convolve(m24w, m24r, WAVELENGTHS, y2)/fm24star
+    # Calculate flux ratios at 70 microns frf
+    fm70star  = convolve(m70w, m70r, WAVELENGTHS, ngModel)
+    fm70warm  = convolve(m70w, m70r, WAVELENGTHS, y1)/fm70star
+    fm70cold  = convolve(m70w, m70r, WAVELENGTHS, y2)/fm70star
+    # Calculate flux ratios at 160 microns frf
+    fm160star = convolve(m160w, m160r, WAVELENGTHS, ngModel)
+    fm160warm = convolve(m160w, m160r, WAVELENGTHS, y1)/fm160star
+    fm160cold = convolve(m160w, m160r, WAVELENGTHS, y2)/fm160star
+    if np.any(y3):
+        # y3 is only for fits with two co-located warm belts
+        fm24warmsmall = convolve(m24w, m24r, WAVELENGTHS, y3)/fm24star
+        fm70warmsmall = convolve(m70w, m70r, WAVELENGTHS, y3)/fm70star
+        fm160warmsmall = convolve(m160w, m160r, WAVELENGTHS, y3)/fm160star
+    else:
+        fm24warmsmall, fm70warmsmall, fm160warmsmall = np.nan, np.nan, np.nan
+    return (fm24warm, fm24cold, fm70warm, fm70cold, fm160warm, fm160cold,
+        fm24warmsmall, fm70warmsmall, fm160warmsmall)
 
 # Star object handles all of the flux calculations
 class Star:
@@ -190,21 +372,30 @@ class Star:
         self.graindex2 = graindex2
         self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
         self.sigma = 0.1
+        self.q = -3.5     # collisional cascade
+        # For the flux calculations, use q = -3.5, so the constant at the end
+        # is affected by this number but is hardcoded in
+        self.graindist = self.makeDist(0.6, 1.4)
 
-    def calcDustMass(self,  n_dust, r_0, a_min, a_max, density, func):
+    def makeDist(self, low, high):
+        # this is always the same regardless of radial location
+        x = np.linspace(low, high, 1000)
+        return np.exp( -50 * (1 - x)**2 )
+
+    def calcDustMass(self,  n_dust, r_0, a_min, a_max, density):
         '''
-        Still a work in progress. Does not work properly yet.
+        Calculate the mass of the small grains in the dust belt.
         '''
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        asdf = np.exp(exponent) * radii1
-        money = integrate.simps(asdf, radii1)
-        dust_mass = (8.0/3.0) * (density*1e3) * n_dust #(self.starD*3.086e16)**2*n_dust
-        dust_mass *= np.sqrt(a_min*a_max) * money
-        return dust_mass/1e26
+        # print(np.exp(exponent))
+        asdf = np.exp(exponent) * 2.0 * np.pi * radii1
+        money = integrate.simps(asdf, radii1) * (4./3.) * (density*1e3)
+        dust_mass = np.sqrt(a_min*a_max) * money * n_dust
+        return dust_mass
 
     def calcFluxWarmMinGrains(self, waves, r_0, bos, T_0=1):
         r0 = r_0 *1.4959787066e11
@@ -213,13 +404,11 @@ class Star:
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
         graindex = find_nearest_ind(GRAINSIZES, bos)
-        grains = GRAINSIZES[graindex:self.graindex1]/1.0e6
+        grains = GRAINSIZES[graindex:self.graindex1]/1e6
         bos /= 1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(self.blowoutSize1,3+q)))
-        ca *= 1e6
+        ca = T_0*np.exp(exponent) \
+            / (np.power(bos,3+self.q)-np.power(self.blowoutSize1,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -231,12 +420,13 @@ class Star:
             (self.emis['AstroSil'][graindex:self.graindex1].shape[0], 1,
             self.emis['AstroSil'][graindex:self.graindex1].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
-        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
+        flux = emis1 * ca1 * grains1**(self.q+2) * radii1 * b_nu(waves1, temps1)
         f = integrate.simps(integrate.simps(flux, grains, axis=0),
             self.radii[rindex], axis=0)
-        return f*1.649407760419599e-07/(self.starD**2)
+        # return f*1.649407760419599e-07/(self.starD**2)
+        return f*3.299e-7/(self.starD**2)
 
-    def calcFluxBoSWarm(self, waves, r_0,bos, T_0=1):
+    def calcFluxBoSWarm(self, waves, r_0, bos, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
@@ -245,10 +435,9 @@ class Star:
         graindex = find_nearest_ind(GRAINSIZES, bos)
         grains = GRAINSIZES[graindex:]/1.0e6
         bos /= 1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+        ca = T_0*np.exp(exponent)\
+            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -260,16 +449,16 @@ class Star:
             (self.emis['AstroSil'][graindex:].shape[0], 1,
             self.emis['AstroSil'][graindex:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
-        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
+        flux = emis1 * ca1 * grains1**(self.q+2) * radii1 * b_nu(waves1, temps1)
         f = integrate.simps(
             integrate.simps(flux, grains, axis=0), self.radii[rindex], axis=0)
         # Convert to Jy -> 1e26
         # Convert star distance to meters -> 3.086e16
-        # The below constant is: 1e26 / (3.086e16**2) * np.pi / 2
+        # The below constant is: 1e26 / (3.086e16**2) * np.pi
         # computation is faster if we just skip to this.
-        return f*1.649407760419599e-07/(self.starD**2)
+        return f*3.299e-7/(self.starD**2)
 
-    def calcFluxBoSCold(self, waves, r_0,bos, T_0=1):
+    def calcFluxBoSCold(self, waves, r_0, bos, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
@@ -278,10 +467,9 @@ class Star:
         graindex = find_nearest_ind(GRAINSIZES, bos)
         grains = GRAINSIZES[graindex:]/1.0e6
         bos /= 1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+        ca = T_0*np.exp(exponent)\
+            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -293,16 +481,16 @@ class Star:
             (self.emis['DirtyIceAstroSil'][graindex:].shape[0], 1,
             self.emis['DirtyIceAstroSil'][graindex:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
-        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
+        flux = emis1 * ca1 * grains1**(self.q+2) * radii1 * b_nu(waves1, temps1)
         f = integrate.simps(integrate.simps(flux, grains, axis=0),
             self.radii[rindex], axis=0)
         # Convert to Jy -> 1e26
         # Convert star distance to meters -> 3.086e16
         # The below constant is: 1e26 / (3.086e16**2) * np.pi / 2
         # computation is faster if we just skip to this.
-        return f*1.649407760419599e-07/(self.starD**2)
+        return f*3.299e-7/(self.starD**2)
 
-    def calcFluxWarm(self, waves, r_0,T_0=1):
+    def calcFluxWarm(self, waves, r_0, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
@@ -310,10 +498,9 @@ class Star:
         grainTemps = self.grainTemps['AstroSil'][rindex]
         grains = GRAINSIZES[self.graindex1:]/1.0e6
         bos = self.blowoutSize1/1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+        ca = T_0*np.exp(exponent)\
+            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -325,12 +512,12 @@ class Star:
             (self.emis['AstroSil'][self.graindex1:].shape[0], 1,
             self.emis['AstroSil'][self.graindex1:].shape[1]))
         radii1 = np.reshape(radii1, (1, radii1.size, 1))
-        flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
+        flux = emis1 * ca1 * grains1**(self.q+2) * radii1 * b_nu(waves1, temps1)
         f = integrate.simps(integrate.simps(flux, grains, axis=0),
             self.radii[rindex], axis=0)
-        return f*1.649407760419599e-07/(self.starD**2)
+        return f*3.299e-7/(self.starD**2)
 
-    def calcFluxCold(self, waves, r_0,T_0=1):
+    def calcFluxCold(self, waves, r_0, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
@@ -338,10 +525,9 @@ class Star:
         grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
         grains = self.grains[self.graindex2:]/1.0e6
         bos = self.blowoutSize2/1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+        ca = T_0*np.exp(exponent)\
+            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
 
         # NumPy Broadcasting enables calculations in C instead of Python
         ca1 = np.reshape(ca, (1, ca.size, 1))
@@ -358,9 +544,9 @@ class Star:
         flux = emis1 * ca1 * grains1**(-1.5) * radii1 * b_nu(waves1, temps1)
         f = integrate.simps(integrate.simps(flux, grains, axis=0),
             self.radii[rindex], axis=0)
-        return f*1.649407760419599e-07/(self.starD**2)
+        return f*3.299e-7/(self.starD**2)
 
-    def deprecated_calcFluxCold(self, waves, r_0,T_0 = 1):
+    def deprecated_calcFluxCold(self, waves, r_0, T_0 = 1):
         '''
         This is kept for use as a comparison to the new algorithm.
         '''
@@ -371,10 +557,9 @@ class Star:
         grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
         grains = self.grains[self.graindex2:]/1.0e6
         bos = self.blowoutSize2/1e6
-        q = -3.5
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
-        ca = T_0*np.exp(exponent)*np.abs(3+q) \
-            / (np.pi*(np.power(bos,3+q)-np.power(.001,3+q)))
+        ca = T_0*np.exp(exponent)\
+            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
 
         # Nested loop in Python
         fw = np.empty(waves.size)
@@ -386,4 +571,4 @@ class Star:
                     (grains**-1.5) * radii1[r] * ca[r]
                 fr[r] = integrate.simps(flux, grains)
             fw[w] = integrate.simps(fr, radii1)
-        return fw*1.649407760419599e-07/(self.starD**2)
+        return fw*3.299e-7/(self.starD**2)
