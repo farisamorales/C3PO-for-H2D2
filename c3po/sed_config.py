@@ -4,11 +4,13 @@ import numpy as np
 import pandas as pd
 from scipy import integrate
 from scipy import constants
+from scipy.interpolate import UnivariateSpline as uni_spline
 from astropy.io import ascii
 
 
 # File Paths
 ARR_DIR     = os.sep.join('Data/Arrays/'.split('/'))
+# STAR_FILES  = os.sep.join('Data/IPAC Files/'.split('/'))
 STAR_FILES  = os.sep.join('Data/StarFiles/'.split('/'))
 KURUCZ      = os.sep.join('Data/StellarModels/kurucz/'.split('/'))
 NEXTGEN     = os.sep.join('Data/StellarModels/nextgen/'.split('/'))
@@ -16,6 +18,7 @@ RES_DIR     = os.sep.join('Results/'.split('/'))
 PLOTS_DIR   = os.sep.join('Results/Plots/'.split('/'))
 PARAMS_DIR  = os.sep.join('Results/Params/'.split('/'))
 FRATIOS_DIR = os.sep.join('Results/FluxRatios/'.split('/'))
+FARRAYS_DIR = os.sep.join('Results/FluxArrays/'.split('/'))
 INTERPS_DIR = os.sep.join('Data/Arrays/InterpGrainTemps/'.split('/'))
 FILTERS_DIR = os.sep.join('Data/FilterResponse/'.split('/'))
 GRAIN_TEMPS_DIR = os.sep.join('Data/GrainTemps/'.split('/'))
@@ -64,6 +67,75 @@ def read_star_file(starFile):
         data[key] = x.meta['keywords'][key]['value']
     return data
 
+def stitch_spitz(allSpitz):
+    # Organize by ascending wavelength
+    # idx = np.argsort(allSpitz['wavelength'])
+    # wav = allSpitz['wavelength'][idx]
+    wav, idx = np.unique(allSpitz['wavelength'], return_index=True)
+    flx = allSpitz['flux'][idx]
+    err = allSpitz['error'][idx]
+    ist = allSpitz['instrument'][idx]
+    # Trim to less than 35 microns wavelengths
+    flx = flx[wav<35]
+    err = err[wav<35]
+    ist = ist[wav<35]
+    wav = wav[wav<35]
+    # Grab the unique Spitzer modules
+    uist = np.unique(ist)
+    # Options for the stitching. cutsize refers to how much of the module is
+    # used to construct the UnivariateSpline. e.g. 2 == one half of the data.
+    # pt2 and pt1 are the points in the arrays where the midpoints begin
+    cutsize =  2
+    pt2     = -4
+    pt1     =  3
+    # Stitch from right to left
+    if 'SpitzerIRS-LL2' in uist and 'SpitzerIRS_LL1' in uist:
+        lidx = np.where(ist=='SpitzerIRS-LL2')
+        ridx = np.where(ist=='SpitzerIRS-LL1')
+        sl = int(wav[lidx].size/3) # last part of left module
+        sr = int(wav[ridx].size/3) # first part of right module
+        # sl = int(wav[lidx].size/cutsize) # last part of left module
+        # sr = int(wav[ridx].size/cutsize) # first part of right module
+        leftfit = uni_spline(wav[lidx][sl:], flx[lidx][sl:])
+        rightfit = uni_spline(wav[ridx][:sr], flx[ridx][:sr])
+        midpoints = np.linspace(wav[lidx][pt2], wav[ridx][pt1], 100)
+        lefty = leftfit(midpoints)
+        righty = rightfit(midpoints)
+        stitchfactor = righty.sum()/lefty.sum()
+        # print("ll2 to ll1: {}".format(stitchfactor))
+        flx[lidx] *= stitchfactor
+    if 'SpitzerIRS-SL1' in uist and 'SpitzerIRS-LL2' in uist:
+        lidx = np.where(ist=='SpitzerIRS-SL1')
+        ridx = np.where(ist=='SpitzerIRS-LL2')
+        sl = int(wav[lidx].size/cutsize) # last part of left module
+        sr = int(wav[ridx].size/cutsize) # first part of right module
+        leftfit = uni_spline(wav[lidx][sl:], flx[lidx][sl:])
+        rightfit = uni_spline(wav[ridx][:sr], flx[ridx][:sr])
+        midpoints = np.linspace(wav[lidx][pt2], wav[ridx][pt1], 100)
+        lefty = leftfit(midpoints)
+        righty = rightfit(midpoints)
+        stitchfactor = righty.sum()/lefty.sum()
+        # print("sl1 to ll2: {}".format(stitchfactor))
+        flx[lidx] *= stitchfactor
+    if 'SpitzerIRS-SL2' in uist and 'SpitzerIRS-SL1' in uist:
+        lidx = np.where(ist=='SpitzerIRS-SL2')
+        ridx = np.where(ist=='SpitzerIRS-SL1')
+        sl = int(wav[lidx].size/cutsize) # last part of left module
+        sr = int(wav[ridx].size/cutsize) # first part of right module
+        leftfit = uni_spline(wav[lidx][sl:], flx[lidx][sl:])
+        rightfit = uni_spline(wav[ridx][:sr], flx[ridx][:sr])
+        midpoints = np.linspace(wav[lidx][pt2], wav[ridx][pt1], 100)
+        lefty = leftfit(midpoints)
+        righty = rightfit(midpoints)
+        stitchfactor = righty.sum()/lefty.sum()
+        # print("sl2 to sl1: {}".format(stitchfactor))
+        flx[lidx] *= stitchfactor
+    # Finally return the stitched data
+    allSpitzStitched = {
+        'wavelength': wav, 'flux': flx, 'error': err, 'instrument': ist
+    }
+    return allSpitzStitched
+
 def sort_spitz_data(starData):
     # Sort Data: Pull SpitzerIRS
     spindexes = np.concatenate((
@@ -72,12 +144,15 @@ def sort_spitz_data(starData):
         np.nonzero('SpitzerIRS-LL2' == starData['instrument'])[0],
         np.nonzero('SpitzerIRS-LL1' == starData['instrument'])[0]
         ))
+    # if len(spindexes) == 0:
+    #     return [], starData
     spitzWaves = starData['wavelength'][spindexes]
     spitzFlux  = starData['flux'][spindexes]
     spitzError = starData['error'][spindexes]
     spitzInsts = starData['instrument'][spindexes]
-    allSpitz   = {'wavelength': spitzWaves, 'flux': spitzFlux,
-        'error': spitzError, 'instrument': spitzInsts}
+    allSpitz   = {'wavelength': spitzWaves[spitzWaves<35],
+        'flux': spitzFlux[spitzWaves<35], 'error': spitzError[spitzWaves<35],
+        'instrument': spitzInsts[spitzWaves<35]}
     # Sort Data: Pull all other Photometry Points
     phindexes = np.nonzero(np.logical_and(
         np.logical_and('SpitzerIRS-SL2' != starData['instrument'],
@@ -299,23 +374,28 @@ def lum_ratio(starFlux, dustFlux, waves):
     l_star = integrate.simps(starFlux, (3e14/waves))
     return l_dust/l_star
 
-def flux_ratios_herschel(y1, y2, ngModel, y3=None):
+def flux_ratios_herschel(y1=None, y2=None, ngModel=None, y3=None):
     # Herschel frequency response functions
     h70w, h70r = np.loadtxt(FILTERS_DIR+'pacs-blue-70.dat', unpack=True)
     h100w, h100r = np.loadtxt(FILTERS_DIR+'pacs-green-100.dat', unpack=True)
     h160w, h160r = np.loadtxt(FILTERS_DIR+'pacs-red-160.dat', unpack=True)
-    # Calculate flux ratios at 70 microns frf
+
+    # Calc flux for the star
     fh70star  = convolve(h70w, h70r, WAVELENGTHS, ngModel)
-    fh70warm  = convolve(h70w, h70r, WAVELENGTHS, y1)/fh70star
-    fh70cold  = convolve(h70w, h70r, WAVELENGTHS, y2)/fh70star
-    # Calculate flux ratios at 100 microns frf
     fh100star = convolve(h100w, h100r, WAVELENGTHS, ngModel)
-    fh100warm = convolve(h100w, h100r, WAVELENGTHS, y1)/fh100star
-    fh100cold = convolve(h100w, h100r, WAVELENGTHS, y2)/fh100star
-    # Calculate flux ratios at 160 microns frf
     fh160star = convolve(h160w, h160r, WAVELENGTHS, ngModel)
-    fh160warm = convolve(h160w, h160r, WAVELENGTHS, y1)/fh160star
+
+    # Calculate flux ratios for the warm belt
+    if np.any(y1):
+        fh70warm  = convolve(h70w, h70r, WAVELENGTHS, y1)/fh70star
+        fh100warm = convolve(h100w, h100r, WAVELENGTHS, y1)/fh100star
+        fh160warm = convolve(h160w, h160r, WAVELENGTHS, y1)/fh160star
+
+    # Calculate flux ratios for the cold belt
+    fh70cold  = convolve(h70w, h70r, WAVELENGTHS, y2)/fh70star
+    fh100cold = convolve(h100w, h100r, WAVELENGTHS, y2)/fh100star
     fh160cold = convolve(h160w, h160r, WAVELENGTHS, y2)/fh160star
+
     if np.any(y3):
         # y3 is only for fits with two co-located warm belts
         fh70warmsmall   = convolve(h70w, h70r, WAVELENGTHS, y3)
@@ -326,26 +406,32 @@ def flux_ratios_herschel(y1, y2, ngModel, y3=None):
         fh160warmsmall /= fh160star
     else:
         fh70warmsmall, fh100warmsmall, fh160warmsmall = np.nan, np.nan, np.nan
+    if not np.any(y1):
+        fh70warm, fh100warm, fh160warm = [np.nan]*3
     return (fh70warm, fh70cold,  fh100warm, fh100cold, fh160warm, fh160cold,
         fh70warmsmall, fh100warmsmall, fh160warmsmall)
 
-def flux_ratios_mips(y1, y2, ngModel, y3=None):
+def flux_ratios_mips(y1=None, y2=None, ngModel=None, y3=None):
     # MIPS frequency response functions
     m24w, m24r = np.loadtxt(FILTERS_DIR+'mips24_frf.txt', unpack=True)
     m70w, m70r = np.loadtxt(FILTERS_DIR+'mips70_frf.txt', unpack=True)
     m160w, m160r = np.loadtxt(FILTERS_DIR+'mips160_frf.txt', unpack=True)
-    # Calculate flux ratios at 24 microns frf
+    # Calc flux for the star
     fm24star  = convolve(m24w, m24r, WAVELENGTHS, ngModel)
-    fm24warm  = convolve(m24w, m24r, WAVELENGTHS, y1)/fm24star
-    fm24cold  = convolve(m24w, m24r, WAVELENGTHS, y2)/fm24star
-    # Calculate flux ratios at 70 microns frf
     fm70star  = convolve(m70w, m70r, WAVELENGTHS, ngModel)
-    fm70warm  = convolve(m70w, m70r, WAVELENGTHS, y1)/fm70star
-    fm70cold  = convolve(m70w, m70r, WAVELENGTHS, y2)/fm70star
-    # Calculate flux ratios at 160 microns frf
     fm160star = convolve(m160w, m160r, WAVELENGTHS, ngModel)
-    fm160warm = convolve(m160w, m160r, WAVELENGTHS, y1)/fm160star
+
+    # Calculate flux ratios for the warm belt
+    if np.any(y1):
+        fm24warm  = convolve(m24w, m24r, WAVELENGTHS, y1)/fm24star
+        fm70warm  = convolve(m70w, m70r, WAVELENGTHS, y1)/fm70star
+        fm160warm = convolve(m160w, m160r, WAVELENGTHS, y1)/fm160star
+
+    # Calculate flux ratios for the cold belt
+    fm24cold  = convolve(m24w, m24r, WAVELENGTHS, y2)/fm24star
+    fm70cold  = convolve(m70w, m70r, WAVELENGTHS, y2)/fm70star
     fm160cold = convolve(m160w, m160r, WAVELENGTHS, y2)/fm160star
+
     if np.any(y3):
         # y3 is only for fits with two co-located warm belts
         fm24warmsmall = convolve(m24w, m24r, WAVELENGTHS, y3)/fm24star
@@ -353,6 +439,8 @@ def flux_ratios_mips(y1, y2, ngModel, y3=None):
         fm160warmsmall = convolve(m160w, m160r, WAVELENGTHS, y3)/fm160star
     else:
         fm24warmsmall, fm70warmsmall, fm160warmsmall = np.nan, np.nan, np.nan
+    if not np.any(y1):
+        fm24warm, fm70warm, fm160warm = [np.nan]*3
     return (fm24warm, fm24cold, fm70warm, fm70cold, fm160warm, fm160cold,
         fm24warmsmall, fm70warmsmall, fm160warmsmall)
 
@@ -397,18 +485,18 @@ class Star:
         dust_mass = np.sqrt(a_min*a_max) * money * n_dust
         return dust_mass
 
-    def calcFluxWarmMinGrains(self, waves, r_0, bos, T_0=1):
+    def calcFluxWarmMinGrains(self, waves, r_0, amin1, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, bos)
+        graindex = find_nearest_ind(GRAINSIZES, amin1)
         grains = GRAINSIZES[graindex:self.graindex1]/1e6
-        bos /= 1e6
+        amin1 /= 1e6
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent) \
-            / (np.power(bos,3+self.q)-np.power(self.blowoutSize1,3+self.q))
+            / (np.power(amin1,3+self.q)-np.power(self.blowoutSize1,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -426,18 +514,18 @@ class Star:
         # return f*1.649407760419599e-07/(self.starD**2)
         return f*3.299e-7/(self.starD**2)
 
-    def calcFluxBoSWarm(self, waves, r_0, bos, T_0=1):
+    def calcFluxWarmAmin(self, waves, r_0, amin1, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['AstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, bos)
+        graindex = find_nearest_ind(GRAINSIZES, amin1)
         grains = GRAINSIZES[graindex:]/1.0e6
-        bos /= 1e6
+        amin1 /= 1e6
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)\
-            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
+            / (np.power(amin1,3+self.q)-np.power(.001,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))
@@ -458,18 +546,18 @@ class Star:
         # computation is faster if we just skip to this.
         return f*3.299e-7/(self.starD**2)
 
-    def calcFluxBoSCold(self, waves, r_0, bos, T_0=1):
+    def calcFluxColdAmin(self, waves, r_0, amin2, T_0=1):
         r0 = r_0 *1.4959787066e11
         rindex = np.where(np.logical_and(self.radii<1.4*r0,
             self.radii>0.6*r0))[0]
         radii1 = self.radii[rindex]
         grainTemps = self.grainTemps['DirtyIceAstroSil'][rindex]
-        graindex = find_nearest_ind(GRAINSIZES, bos)
+        graindex = find_nearest_ind(GRAINSIZES, amin2)
         grains = GRAINSIZES[graindex:]/1.0e6
-        bos /= 1e6
+        amin2 /= 1e6
         exponent = -0.5 * ((radii1 - r0) / (self.sigma*r0))**2
         ca = T_0*np.exp(exponent)\
-            / (np.power(bos,3+self.q)-np.power(.001,3+self.q))
+            / (np.power(amin2,3+self.q)-np.power(.001,3+self.q))
         ca1 = np.reshape(ca, (1, ca.size, 1))
         grains1 = np.reshape(grains, (grains.size, 1, 1))
         waves1 = np.broadcast_to(waves, (1, waves.size))

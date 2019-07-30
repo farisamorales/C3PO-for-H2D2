@@ -20,7 +20,12 @@ densities = {
 
 # Colors for plotting accessed by instrument name
 plotColors = {
-    'B_Tycho': 'brown', 'V_Tycho': 'orange',
+    'B_Tycho': 'brown', 'V_Tycho': 'brown',
+
+    'U_ExoArch': 'orange', 'V_ExoArch': 'orange', 'B_ExoArch': 'orange',
+    'R_ExoArch': 'orange', 'I_ExoArch': 'orange',
+
+    'IRAC1': 'yellow', 'IRAC2': 'yellow', 'IRAC3': 'yellow', 'IRAC4': 'yellow',
 
     '2MASSJ': 'red', '2MASSH': 'red', '2MASSK': 'red',
 
@@ -28,6 +33,7 @@ plotColors = {
     'AllSkyW1': 'blue', 'AllSkyW2': 'blue', 'AllSkyW3': 'blue',
     'AllSkyW4': 'blue', 'AllWiseW1': 'blue', 'AllWiseW2': 'blue',
     'AllWiseW3': 'blue', 'AllWiseW4': 'blue',
+
     'MIPS24': 'green', 'MIPS70': 'green',
     'MIPS24UL':'green', 'MIPS70UL':'green',
 
@@ -37,11 +43,18 @@ plotColors = {
     }
 
 # Saturation limits for each instrument, in Jy
+# inf -> do not currently have the limit
 satLims = {
     '2MASSJ': 10.057, '2MASSH': 10.24, '2MASSK': 10.566,
+
     'WISE1':0.18, 'WISE2': 0.36, 'WISE3': 0.88, 'WISE4': 12.0,
+
     'HerschelPACS70': 220., 'HerschelPACS100': 510., 'HerschelPACS160':1125.,
-    'MIPS24': float('inf'), 'MIPS70': float('inf')
+
+    'MIPS24': float('inf'), 'MIPS70': float('inf'),
+
+
+
     }
 
 # Conversion factors

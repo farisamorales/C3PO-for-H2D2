@@ -38,10 +38,10 @@ direc = './Results/Params'
 direcs = pull_direcs(direc)
 for d in direcs:
     x = aggregate(d)
-    x.to_csv(d+os.sep+'__MasterResults.csv', index=False)
+    x.to_csv(d+os.sep+'__ParamsMasterResults.csv', index=False)
 
-direc = './Results/FluxRatios'
-direcs = pull_direcs(direc)
-for d in direcs:
-    x = aggregate(d)
-    x.to_csv(d+os.sep+'__MasterResults.csv', index=False)
+# direc = './Results/FluxRatios'
+# direcs = pull_direcs(direc)
+# for d in direcs:
+#     x = aggregate(d)
+#     x.to_csv(d+os.sep+'__MasterResults.csv', index=False)

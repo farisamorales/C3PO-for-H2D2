@@ -1,57 +1,91 @@
 '''
-Set the bounds for individual stars using this file.
+------------Set the bounds for individual stars using this file-----------------
+
+################################################################################
+     Template for changing the bound options. These are the defaults!
+################################################################################
+
+
+    They must always be in ascending order, from Low -> High.
+    HighInner/HighOuter must always be a greater number than LowInner/LowOuter
+
+
+elif starName == 'HD 105':
+    # Warm
+    amin1_Low  = 0.1
+    amin1_High = 3
+    # Cold
+    amin2_Low  = 0.1
+    amin2_High = 3
+
+
+
 '''
-
 def boundify(starName):
-    ############################################################################
-    #                           COLD BELT BOUNDS
-    ############################################################################
-    ###############
-    # UPPER BOUNDS
-    ###############
-    if starName == 'HD 110411':
-        # Indicative of cleaner ice water in the outer region since it needs
-        # a narrower SED for the cold belt
-        bosHighOuter = 1
-    elif starName == 'HD 113337':
-        bosHighOuter = 5
+    if starName == 'HD 105':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 2
+        # Cold
+        amin2_Low  = 3
+        amin2_High = 5
+    elif starName == 'HD 10647':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 2
+        # Cold
+        amin2_Low  = 1.25
+        amin2_High = 5
+    elif starName == 'HD 32297':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 0.7
+        # Cold
+        amin2_Low  = 0.1
+        amin2_High = 2
+    elif starName == 'HD 110897':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 0.1
+        amin2_High = 3
+    elif starName == 'HD 15115':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 1
+        amin2_High = 3
 
-    else: # default is 5
-        bosHighOuter = 5
-
-    # Lower bound is how much the bound is divided by. Use a fraction
-    # to increase the lower bound
-    ###############
-    # LOWER BOUNDS
-    ###############
-    if starName == 'HD 110897':
-        bosLowOuter = 1/3
-    elif starName == 'HD 113337':
-        bosLowOuter = 1
-    else: # default is 10
-        bosLowOuter = 10
-
-
-    ############################################################################
-    #                           WARM BELT BOUNDS
-    ############################################################################
-    ###############
-    # UPPER BOUNDS
-    ###############
-    if starName == 'HD 110411':
-        bosHighInner = 3
+    elif starName == 'HD 153053':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 1
+        amin2_High = 3
+    elif starName == 'HD 164249':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 1
+        amin2_High = 3
+    elif starName == 'HD 192425':
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 0.01
+        amin2_High = 0.5
+    # These are the default values
     else:
-        bosHighInner = 3
+        # Warm
+        amin1_Low  = 0.1
+        amin1_High = 3
+        # Cold
+        amin2_Low  = 0.1
+        amin2_High = 3
 
-    ###############
-    # LOWER BOUNDS
-    ###############
-    # Lower bound is how much the bound is divided by. Use a fraction
-    # to increase the lower bound
-    if starName == 'HD 110411':
-        bosLowInner = 10
-    else:
-        bosLowInner = 10
-
-
-    return bosLowInner, bosHighInner, bosLowOuter, bosHighOuter
+    return amin1_Low, amin1_High, amin2_Low, amin2_High
