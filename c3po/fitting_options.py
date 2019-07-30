@@ -24,10 +24,13 @@ for name in names:
 # WISE data is crazy
 # HD 191174
 
-
+cccc = starNames.index('HD 71722')
 # starNames = ['HD 32297']
 # starNames = ['HD 71722']
 # starNames = ['HD 128207']
+# starNames = ['HD 138965']
+# starNames = starNames[cccc:]
+# starNames = ['BD-19 1062']
 
 # Set the upper and lower bounds for the fitting
 # Upper bound for the cold belt radius:

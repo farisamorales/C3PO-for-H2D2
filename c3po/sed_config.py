@@ -27,17 +27,19 @@ GRAIN_TEMPS_DIR = os.sep.join('Data/GrainTemps/'.split('/'))
 GRAINSIZES = np.loadtxt(ARR_DIR + 'GrainSizes.dat')
 WAVELENGTHS = np.loadtxt(ARR_DIR + 'Wavelengths.dat')
 STAR_TEMPS = np.linspace(2000, 15000, 14)
-DISK_RADII = np.logspace(-1, 3, 121)
 WAVES = np.logspace(-3, 3, 1000)
-TEMPS_RADII = np.logspace(-1, 3, 1000)
+TEMPS_RADII = np.append(
+    np.logspace(-3, 1, 100),
+    np.logspace(1, 3, 900)
+    )
 
 # Grain temperatures per grain composition
 # Deprecated soon?
 grainComps = ['AstroSil', 'DirtyIceAstroSil']
-GRAIN_TEMPS_TOTAL = dict()
+# GRAIN_TEMPS_TOTAL = dict()
 EMISSIVITIES_TOTAL = dict()
 for grain in grainComps:
-    GRAIN_TEMPS_TOTAL[grain] = np.load(ARR_DIR+grain+'GrainTemps.npy')
+    # GRAIN_TEMPS_TOTAL[grain] = np.load(ARR_DIR+grain+'GrainTemps.npy')
     EMISSIVITIES_TOTAL[grain] = np.load(ARR_DIR+grain+'Emissivities.npy')
 
 ################################################################################
@@ -458,12 +460,13 @@ class Star:
         self.grains = grains
         self.graindex1 = graindex1
         self.graindex2 = graindex2
-        self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
+        # self.radii = np.logspace(-1, 3, 1000)*1.4959787066e11
+        self.radii = TEMPS_RADII*1.4959787066e11
         self.sigma = 0.1
         self.q = -3.5     # collisional cascade
         # For the flux calculations, use q = -3.5, so the constant at the end
         # is affected by this number but is hardcoded in
-        self.graindist = self.makeDist(0.6, 1.4)
+        # self.graindist = self.makeDist(0.6, 1.4)
 
     def makeDist(self, low, high):
         # this is always the same regardless of radial location

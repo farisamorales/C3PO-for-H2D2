@@ -192,8 +192,8 @@ def run_fits(starName):
 
     # Calculate luminosity of the star given the stellar model and star distance
     luminosity = sconf.calc_luminosity(ngWave, ngFnu, starD)
-    print( 'Calculated luminosity: {:0.3f}'.format(luminosity) )
-    print( 'Given luminosity: {:0.3f}'.format(starL) )
+    print( 'Calculated luminosity: {:0.3e}'.format(luminosity) )
+    print( 'Given luminosity: {:0.3e}'.format(starL) )
     # grain temps calculator depends on having accurate luminosities
     starL = luminosity if (starL == 1) else starL
 
@@ -213,6 +213,7 @@ def run_fits(starName):
     grainTemps = dict()
     for grainComp in grainComps:
         try:
+            raise ValueError
             grainTemps[grainComp] = np.load(
                 sconf.GRAIN_TEMPS_DIR+'{}_{}.npy'.format(starName, grainComp))
         except:
@@ -228,15 +229,15 @@ def run_fits(starName):
 
     # Grab the minimum radial location that's below the temp
     # of sublimation for volatiles. (Icy belt radius)
-    for r in range(1000):
+    for r in range(sconf.TEMPS_RADII.size):
         # If mean temp < 120, then that becomes the min radius
         if np.nanmean(grainTemps[outerGrain][r]) < 120:
             break
-    minRad = np.logspace(-1, 3, 1000)[r]
+    minRad = sconf.TEMPS_RADII[r]
 
     print( '----------------------------------------' )
-    print( '      AS blowout size: {:.2f}'.format(bos1) )
-    print( '     IMP blowout size: {:.2f}'.format(bos2) )
+    print( '      AS blowout size: {:.2e}'.format(bos1) )
+    print( '     IMP blowout size: {:.2e}'.format(bos2) )
     print( ' Minimum radius for an icy belt: {:.2f}'.format(minRad) )
 
     # Warm r0 guess is half the distance between the cold belt min & the star
@@ -588,10 +589,12 @@ def run_fits(starName):
         # spitzer wavelengths so that I can do the stacking
         # First, interpolate each model to the spitzer waves
         if spitzWaves.size and stackSave:
-            if amin1 < bos1:
-                medium_warm_flux = star1.calcFluxWarmAmin(sconf.WAVELENGTHS,
+            if amin1 < bos1 and \
+                sconf.find_nearest(sconf.GRAINSIZES, amin1) < \
+                sconf.find_nearest(sconf.GRAINSIZES, bos1):
+                medium_warm_flux = star2.calcFluxWarmAmin(sconf.WAVELENGTHS,
                     RW, bos1) * n1
-                small_warm_flux = star1.calcFluxWarmMinGrains(sconf.WAVELENGTHS,
+                small_warm_flux = star2.calcFluxWarmMinGrains(sconf.WAVELENGTHS,
                     RW, amin1) * n1
                 medium_warm_ideal = np.exp(np.interp(
                     np.log(spitzWaves), np.log(sconf.WAVELENGTHS),
@@ -602,8 +605,8 @@ def run_fits(starName):
                     np.log(small_warm_flux)
                     ))
             else:
-                medium_warm_ideal = [np.nan]
-                small_warm_ideal = [np.nan]
+                medium_warm_ideal = [np.nan]*spitzWaves.size
+                small_warm_ideal = [np.nan]*spitzWaves.size
             warm_ideal = np.exp(np.interp(
                 np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y1)
                 ))
