@@ -1,15 +1,18 @@
+# native libraries
 import os
 import time
+# third party libraries
 import numpy as np
 import pandas as pd
 from scipy.optimize import curve_fit
 from scipy.optimize import OptimizeWarning
 import matplotlib.pyplot as plt
-import sed_config as sconf
-import temps_config as tconf
-import bound_options
-from common_variables import *
-from fitting_options import *
+# user defined libraries
+import config_sed as conf_s
+import config_temps as conf_t
+from config_vars import *
+from options_fits import *
+from options_bounds import boundify
 
 
 # Run this code in the main loop
@@ -27,25 +30,25 @@ def run_fits(starName):
     #                      READ IN STELLAR PROPERTIES
     ############################################################################
     # Read in the star file
-    starData = sconf.read_star_file(sconf.STAR_FILES+'{}_stitched.txt'.format(
-    # starData = sconf.read_star_file(sconf.STAR_FILES+'{}.txt'.format(
+    starData = conf_s.read_star_file(conf_s.STAR_FILES+'{}_stitched.txt'.format(
+    # starData = conf_s.read_star_file(conf_s.STAR_FILES+'{}.txt'.format(
         starName))
     starT    = int(starData['TEMP'])
     starL    = starData[  'starL']
     specType = starData[ 'SpType']
     starD    = starData['DIST_pc']
-    starMass = starData[  'starM']
+    starM = starData[  'starM']
     # Fillers for in case the data is missing.
-    starL    = [   starL, 1][   np.isnan(starL)]
-    starMass = [starMass, 1][np.isnan(starMass)]
-    starD    = [   starD, 1][   np.isnan(starD)]
+    starL    = [   starL, 1][   int(np.isnan(starL))]
+    starM = [starM, 1][int(np.isnan(starM))]
+    starD    = [   starD, 1][   int(np.isnan(starD))]
 
     ############################################################################
     #               HANDLE OBSERVED DATA / CONSTRUCT FITTING DATA
     ############################################################################
     # Sort Data according to SpitzerIRS vs all else
-    allSpitz, nonSpitz = sconf.sort_spitz_data(starData)
-    allSpitz = sconf.stitch_spitz(allSpitz)
+    allSpitz, nonSpitz = conf_s.sort_spitz_data(starData)
+    allSpitz = conf_s.stitch_spitz(allSpitz)
     spitzWaves = allSpitz['wavelength']
     spitzFlux  = allSpitz[      'flux']
     spitzError = allSpitz[     'error']
@@ -61,7 +64,7 @@ def run_fits(starName):
         return
 
     # Sort Data according to AllWise/AllSky vs all else
-    allSky, allWise, allData = sconf.sort_wise_data(nonSpitz)
+    allSky, allWise, allData = conf_s.sort_wise_data(nonSpitz)
 
     # Choose either AllWise or AllSky, both, or neither
     if useAllWise and useAllSky:
@@ -88,28 +91,20 @@ def run_fits(starName):
     # Separate any UL data points for the fitting data points (3*sigma > signal)
     # Upper limits criterion 1
     idx      = np.where( (allFlux/allError) > 3 )
-    fitWaves = allWaves[idx]
-    fitFlux  = allFlux[idx]
-    fitError = allError[idx]
-    fitInsts = allInsts[idx]
+    fitWaves = allWaves[idx]; fitFlux  = allFlux[idx]
+    fitError = allError[idx]; fitInsts = allInsts[idx]
     idx      = np.where( (allFlux/allError) <= 3 )
-    ulWaves  = allWaves[idx]
-    ulFlux   = allFlux[idx] + 3*allError[idx]
-    ulError  = allError[idx]
-    ulInsts  = allInsts[idx]
+    ulWaves  = allWaves[idx]; ulFlux   = allFlux[idx] + 3*allError[idx]
+    ulError  = allError[idx]; ulInsts  = allInsts[idx]
     # Remove any NaN data points (Simply missing data)
     idx      = np.isfinite(fitFlux)
-    fitWaves = fitWaves[idx]
-    fitFlux  = fitFlux[idx]
-    fitError = fitError[idx]
-    fitInsts = fitInsts[idx]
+    fitWaves = fitWaves[idx]; fitFlux  = fitFlux[idx]
+    fitError = fitError[idx]; fitInsts = fitInsts[idx]
     # Remove any points with NaN for error
     # Upper Limits criterion 2
     idx      = np.isfinite(fitError)
-    fitWaves = fitWaves[idx]
-    fitFlux  = fitFlux[idx]
-    fitError = fitError[idx]
-    fitInsts = fitInsts[idx]
+    fitWaves = fitWaves[idx]; fitFlux  = fitFlux[idx]
+    fitError = fitError[idx]; fitInsts = fitInsts[idx]
     # Put these points into the upper limit arrays
     idx      = np.isnan(allError)
     ulWaves  = np.append(ulWaves, allWaves[idx])
@@ -118,21 +113,15 @@ def run_fits(starName):
     ulInsts  = np.append(ulInsts, allInsts[idx])
     # Finally organize UL data into ascending order
     idx     = np.argsort(ulWaves)
-    ulWaves = ulWaves[idx]
-    ulFlux  = ulFlux[idx]
-    ulError = ulError[idx]
-    ulInsts = ulInsts[idx]
+    ulWaves = ulWaves[idx]; ulFlux  = ulFlux[idx]
+    ulError = ulError[idx]; ulInsts = ulInsts[idx]
     # For plotting we don't want the UL data in totals
-    allWaves = np.copy(fitWaves)
-    allFlux  = np.copy(fitFlux)
-    allError = np.copy(fitError)
-    allInsts = np.copy(fitInsts)
+    allWaves = np.copy(fitWaves); allFlux  = np.copy(fitFlux)
+    allError = np.copy(fitError); allInsts = np.copy(fitInsts)
     # Organize into ascending order by wavelength
     idx      = np.argsort(allWaves)
-    allWaves = allWaves[idx]
-    allFlux  = allFlux[idx]
-    allError = allError[idx]
-    allInsts = allInsts[idx]
+    allWaves = allWaves[idx]; allFlux  = allFlux[idx]
+    allError = allError[idx]; allInsts = allInsts[idx]
 
     # Convolve SpitzerIRS to MIPS24 frf if possible
     if 'MIPS24' in starData['instrument'] and spitzInsts.size:
@@ -140,9 +129,9 @@ def run_fits(starName):
         idx = np.where(starData['instrument'] == 'MIPS24')
         MIPS24W = starData['wavelength'][idx]
         MIPS24F = starData['flux'][idx]
-        mipsw, mipsr = np.loadtxt(sconf.FILTERS_DIR + 'mips24_frf.txt',
+        mipsw, mipsr = np.loadtxt(conf_s.FILTERS_DIR + 'mips24_frf.txt',
             unpack=True)
-        IRS24      = sconf.convolve(mipsw, mipsr, spitzWaves, spitzFlux)
+        IRS24      = conf_s.convolve(mipsw, mipsr, spitzWaves, spitzFlux)
         spitzFlux *= (MIPS24F/IRS24)
         fitWaves   = np.append(fitWaves, spitzWaves)
         fitFlux    = np.append(fitFlux, spitzFlux)
@@ -163,7 +152,7 @@ def run_fits(starName):
     #                      LOAD AND NORMALIZE STELLAR MODEL
     ############################################################################
     # Load the stellar model
-    ngWave, ngFnu, starLabel = sconf.load_stellar_model(starT)
+    ngWave, ngFnu, starLabel = conf_s.load_stellar_model(starT)
     # Normalize stellar model from either SL2 or 2MASSK data.
     if 'SpitzerIRS-SL2' in spitzInsts:
         idx          = np.where(np.logical_and(fitWaves>5, fitWaves<5.5))
@@ -174,7 +163,8 @@ def run_fits(starName):
     elif '2MASSK' in allInsts:
         # Find the 2MASSK data
         idx = np.where(starData['instrument'] == '2MASSK')
-        if (starData['flux'][idx] * 0.25) < starData['error'][idx] and 'B_Tycho' in allInsts:
+        if ( (starData['flux'][idx] * 0.25) < starData['error'][idx]
+            and 'B_Tycho' in allInsts ):
             # IF 0.25FLUX < SIGMA for 2MASSK, then we use B_Tycho instead
             idx = np.where(starData['instrument'] == 'B_Tycho')
             # However, if we don't have B_Tycho, then we will still use 2MASSK
@@ -191,49 +181,56 @@ def run_fits(starName):
         np.log(ngFnu)))
 
     # Calculate luminosity of the star given the stellar model and star distance
-    luminosity = sconf.calc_luminosity(ngWave, ngFnu, starD)
+    luminosity = conf_s.calc_luminosity(ngWave, ngFnu, starD)
     print( 'Calculated luminosity: {:0.3e}'.format(luminosity) )
     print( 'Given luminosity: {:0.3e}'.format(starL) )
     # grain temps calculator depends on having accurate luminosities
     starL = luminosity if (starL == 1) else starL
 
-
-    # Create the star objects
-    # Calculate blowoutsize given grain density
-    bos1 = sconf.blowout_size(densities[innerGrain], starL, starMass)
-    bos2 = sconf.blowout_size(densities[outerGrain], starL, starMass)
-    bos1 *= bosScalar1
-    bos2 *= bosScalar2
-
-    # Index of grains greater than the blowout size
-    graindex1 = sconf.find_nearest_ind(sconf.GRAINSIZES, bos1)
-    graindex2 = sconf.find_nearest_ind(sconf.GRAINSIZES, bos2)
-
     # Load the grain temperatures, or calculate them
     grainTemps = dict()
     for grainComp in grainComps:
         try:
-            raise ValueError
+            if recalcTemps:
+                raise ValueError
             grainTemps[grainComp] = np.load(
-                sconf.GRAIN_TEMPS_DIR+'{}_{}.npy'.format(starName, grainComp))
+                conf_s.GRAIN_TEMPS_DIR+'{}_{}.npy'.format(starName, grainComp))
         except:
-            grainTemps[grainComp] = tconf.calc_temps(starT, starL, grainComp)
+            print('calculating temperature for {}'.format(grainComp))
+            grainTemps[grainComp] = conf_t.calc_temps(starT, starL, grainComp)
             np.save(
-                sconf.GRAIN_TEMPS_DIR+'{}_{}.npy'.format(starName, grainComp),
+                conf_s.GRAIN_TEMPS_DIR+'{}_{}.npy'.format(starName, grainComp),
                 grainTemps[grainComp], allow_pickle=False
                 )
+    if recalcTemps:
+        return
 
-    # hi res emissivities star object
-    star2 = sconf.Star(starD, starL, starT, grainTemps, bos1, bos2,
-        sconf.EMISSIVITIES_TOTAL, sconf.GRAINSIZES, graindex1, graindex2)
+    # Interpolate the emissivities to fitWaves
+    emis = {}
+    emis[innerGrain] = np.empty((conf_s.GRAINSIZES.size, fitWaves.size))
+    for g in range(conf_s.GRAINSIZES.size):
+        emis[innerGrain][g] = np.interp(fitWaves, conf_s.WAVELENGTHS,
+            conf_s.EMISSIVITIES_TOTAL[innerGrain][g])
+    emis[outerGrain] = np.empty((conf_s.GRAINSIZES.size, fitWaves.size))
+    for g in range(conf_s.GRAINSIZES.size):
+        emis[outerGrain][g] = np.interp(fitWaves, conf_s.WAVELENGTHS,
+            conf_s.EMISSIVITIES_TOTAL[outerGrain][g])
+
+    # create the star object. both low and high resolution
+    star = conf_s.Star(starName, starD, starL, starT, starM, grainTemps, emis,
+        fitWaves)
+
+    # Pull the blowoutsize
+    star.bos1 *= bosScalar1; star.bos2 *= bosScalar2
+    bos1 = star.bos1; bos2 = star.bos2
 
     # Grab the minimum radial location that's below the temp
     # of sublimation for volatiles. (Icy belt radius)
-    for r in range(sconf.TEMPS_RADII.size):
+    for r in range(conf_s.TEMPS_RADII.size):
         # If mean temp < 120, then that becomes the min radius
         if np.nanmean(grainTemps[outerGrain][r]) < 120:
             break
-    minRad = sconf.TEMPS_RADII[r]
+    minRad = conf_s.TEMPS_RADII[r]
 
     print( '----------------------------------------' )
     print( '      AS blowout size: {:.2e}'.format(bos1) )
@@ -275,20 +272,6 @@ def run_fits(starName):
     print( 'initial guess for RW: {:.2f}'.format(bbr1) )
     print( 'initial guess for RC: {:.2f}'.format(bbr2) )
 
-    # Interp emissivities to fitWaves
-    emis = {}
-    emis[innerGrain] = np.empty((sconf.GRAINSIZES.size, fitWaves.size))
-    for g in range(sconf.GRAINSIZES.size):
-        emis[innerGrain][g] = np.interp(fitWaves, sconf.WAVELENGTHS,
-            sconf.EMISSIVITIES_TOTAL[innerGrain][g])
-    emis[outerGrain] = np.empty((sconf.GRAINSIZES.size, fitWaves.size))
-    for g in range(sconf.GRAINSIZES.size):
-        emis[outerGrain][g] = np.interp(fitWaves, sconf.WAVELENGTHS,
-            sconf.EMISSIVITIES_TOTAL[outerGrain][g])
-    # Low res emissivities star object
-    star1 = sconf.Star(starD, starL, starT, grainTemps, bos1, bos2,
-        emis, sconf.GRAINSIZES, graindex1, graindex2)
-
     # Normalize warm and cold dust
     # Set initial guess for the blowout size. If the bounded region includes the
     # calculated blowout size, use that, else go in between the bounds.
@@ -301,19 +284,19 @@ def run_fits(starName):
     else:
         p0amin2 = bos2
     if oneWander:
-        bb1 = star1.calcFluxWarmAmin(fitWaves, bbr1, p0amin1)
-        bb2 = star1.calcFluxCold(fitWaves, bbr2)
+        bb1 = star.low_res_warm_amin(fitWaves, bbr1, p0amin1)
+        bb2 = star.low_res_cold(fitWaves, bbr2)
     elif twoWander:
-        bb1 = star1.calcFluxWarmAmin(fitWaves, bbr1, p0amin1)
-        bb2 = star1.calcFluxColdAmin(fitWaves, bbr2, p0amin2)
+        bb1 = star.low_res_warm_amin(fitWaves, bbr1, p0amin1)
+        bb2 = star.low_res_cold_amin(fitWaves, bbr2, p0amin2)
     elif noWander:
-        bb1 = star1.calcFluxWarm(fitWaves, bbr1)
-        bb2 = star1.calcFluxCold(fitWaves, bbr2)
+        bb1 = star.low_res_warm(fitWaves, bbr1)
+        bb2 = star.low_res_cold(fitWaves, bbr2)
     elif twoWarmBelts:
-        bb1 = star1.calcFluxWarm(fitWaves, bbr1)
-        bb2 = star1.calcFluxCold(fitWaves, bbr2)
+        bb1 = star.low_res_warm(fitWaves, bbr1)
+        bb2 = star.low_res_cold(fitWaves, bbr2)
     elif oneBeltWander:
-        bb2 = star1.calcFluxColdAmin(fitWaves, bbr2, p0amin2)
+        bb2 = star.low_res_cold_amin(fitWaves, bbr2, p0amin2)
 
     # warm
     if not oneBeltWander:
@@ -348,12 +331,12 @@ def run_fits(starName):
     # oneBelt
     def oneColdBelt(waves, r0cold, n2, n3):
         '''One cold belt with a_min == calculated blowout size'''
-        return n2*star1.calcFluxCold(waves, r0cold) + n3*ngFnu_fit
+        return n2*star.low_res_cold(waves, r0cold) + n3*ngFnu_fit
 
     # oneBeltWander
     def oneColdWander(waves, r0cold, n2, n3, amin2):
         '''One cold belt with wandering a_min'''
-        return n2*star1.calcFluxColdAmin(waves, r0cold, amin2) + n3*ngFnu_fit
+        return n2*star.low_res_cold_amin(waves, r0cold, amin2) + n3*ngFnu_fit
 
     ############################################################################
     #                      Two Belt fitting functions
@@ -362,24 +345,24 @@ def run_fits(starName):
     # option: noWander
     def warmCold(waves, r0warm, r0cold, n1, n2, n3):
         ''' Standard realistic grain fit: one warm belt, one cold belt '''
-        return n1*star1.calcFluxWarm(waves, r0warm) \
-            + n2*star1.calcFluxCold(waves, r0cold) + n3*ngFnu_fit
+        return n1*star.low_res_warm(waves, r0warm) \
+            + n2*star.low_res_cold(waves, r0cold) + n3*ngFnu_fit
     # option: oneWander
     def oneWarmWander(waves, r0warm, r0cold, amin1, n1, n2, n3):
         ''' one warm belt with a wandering blowout grain size, one cold belt '''
-        return n1*star1.calcFluxWarmAmin(waves, r0warm, amin1) \
-            + n2*star1.calcFluxCold(waves, r0cold) + n3*ngFnu_fit
+        return n1*star.low_res_warm_amin(waves, r0warm, amin1) \
+            + n2*star.low_res_cold(waves, r0cold) + n3*ngFnu_fit
     # option: twoWander
     def warmColdWander(waves, r0warm, r0cold, amin1, amin2, n1, n2, n3):
         ''' one warm belt with a wandering blowout grain size,
         one cold belt with a wandering blowout grain size'''
-        return n1*star1.calcFluxWarmAmin(waves, r0warm, amin1) \
-            + n2*star1.calcFluxColdAmin(waves, r0cold, amin2) + n3*ngFnu_fit
+        return n1*star.low_res_warm_amin(waves, r0warm, amin1) \
+            + n2*star.low_res_cold_amin(waves, r0cold, amin2) + n3*ngFnu_fit
     # option: twoWarmBelts
     def twoWarmCold(waves, r0warm, r0cold, amin1, n1, n2, n3, n4):
-        return n1*star1.calcFluxWarm(waves, r0warm) \
-            + n2*star1.calcFluxCold(waves, r0cold) + n3*ngFnu_fit \
-            + n4*star1.calcFluxWarmMinGrains(waves, r0warm, amin1)
+        return n1*star.low_res_warm(waves, r0warm) \
+            + n2*star.low_res_cold(waves, r0cold) + n3*ngFnu_fit \
+            + n4*star.low_res_warm_small(waves, r0warm, amin1)
 
 
     ############################################################################
@@ -432,13 +415,13 @@ def run_fits(starName):
     elif twoWarmBelts:
         # params: r0warm, r0cold, amin1, n1, n2, n3, n4
         if useSpatialRadii and sTrigger:
-            lBounds = [0.3, bbr2-bbr2_unc, amin1_Low*bos1, n_1/beltBound, n_2/beltBound,
-                n_3*0.8, n_1/beltBound]
+            lBounds = [0.3, bbr2-bbr2_unc, amin1_Low*bos1, n_1/beltBound,
+                n_2/beltBound, n_3*0.8, n_1/beltBound]
             uBounds = [minRad, bbr2+bbr2_unc, bos1, n_1*beltBound,
                 n_2*beltBound, n_3*1.2, n_1*beltBound]
         else:
-            lBounds = [0.3, minRad, amin1_Low*bos1, n_1/beltBound, n_2/beltBound,
-                n_3*0.8, n_1/beltBound]
+            lBounds = [0.3, minRad, amin1_Low*bos1, n_1/beltBound,
+                n_2/beltBound, n_3*0.8, n_1/beltBound]
             uBounds = [minRad, maxRad, bos1, n_1*beltBound, n_2*beltBound,
                 n_3*1.2, n_1*beltBound]
         p0=(rw, rc, bos1/2, n_1, n_2, n_3, n_1)
@@ -482,7 +465,7 @@ def run_fits(starName):
         return
     except ValueError:
         print('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-        print('ValueError: Either xdata or ydata contains NaN')
+        print('ValueError: Potentially xdata or ydata contains NaN')
         print('Check flux sigma for nan values.')
         print('Use those points as UL data instead.')
         print('Continuing with next star')
@@ -533,7 +516,7 @@ def run_fits(starName):
         resid = fitFlux-oneWarmWander(fitWaves, RW, RC, amin1, n1, n2, n3)
         degsFreedom = fitWaves.size - 6 # ^ number of fit params ^
     elif twoWander:
-        resid = fitFlux-warmColdWander(fitWaves, RW, RC, amin1, amin2, n1, n2, n3)
+        resid = fitFlux-warmColdWander(fitWaves,RW,RC,amin1,amin2,n1,n2,n3)
         degsFreedom = fitWaves.size - 7 # ^ number of fit params ^
     elif noWander:
         resid = fitFlux-warmCold(fitWaves, RW, RC, n1, n2, n3)
@@ -557,64 +540,54 @@ def run_fits(starName):
         # Otherwise just create a figure with a single plot for the model + data
         fig = plt.figure(figsize=(8, 6))
         ax = fig.add_subplot(111)
-    SMALL_SIZE = 8
-    MEDIUM_SIZE = 12
-    BIGGER_SIZE = 18
-    plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
-    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
-    plt.rc('axes', labelsize=BIGGER_SIZE)     # fontsize of the x and y labels
-    plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-    plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
-    plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
-    plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
 
     # Calculate the high resolution totalFlux array given the optimized
     # parameters
     if oneWander:
-        y1 = n1 * star2.calcFluxWarmAmin(sconf.WAVELENGTHS, RW, amin1)
-        y2 = n2 * star2.calcFluxCold(sconf.WAVELENGTHS, RC)
-        ngModel = np.e**np.interp(np.log(sconf.WAVELENGTHS), np.log(ngWave),
+        y1 = n1 * star.high_res_warm_amin(conf_s.WAVELENGTHS, RW, amin1)
+        y2 = n2 * star.high_res_cold(conf_s.WAVELENGTHS, RC)
+        ngModel = np.e**np.interp(np.log(conf_s.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
         totalFlux = y1 + y2 + ngModel
-        np.savetxt(sconf.FARRAYS_DIR+'Warm Wander/{}.txt'.format(starName),
-            np.column_stack((sconf.WAVELENGTHS, y1, y2, ngModel, totalFlux)),
+        np.savetxt(conf_s.FARRAYS_DIR+'Warm Wander/{}.txt'.format(starName),
+            np.column_stack((conf_s.WAVELENGTHS, y1, y2, ngModel, totalFlux)),
             header='waves\twarm\tcold\tstellarmodel\ttotalflux')
     elif twoWander:
-        y1 = n1 * star2.calcFluxWarmAmin(sconf.WAVELENGTHS, RW, amin1)
-        y2 = n2 * star2.calcFluxColdAmin(sconf.WAVELENGTHS, RC, amin2)
-        ngModel = np.e**np.interp(np.log(sconf.WAVELENGTHS), np.log(ngWave),
+        y1 = n1 * star.high_res_warm_amin(conf_s.WAVELENGTHS, RW, amin1)
+        y2 = n2 * star.high_res_cold_amin(conf_s.WAVELENGTHS, RC, amin2)
+        ngModel = np.e**np.interp(np.log(conf_s.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
         totalFlux = y1 + y2 + ngModel
         # I want to save the spitzer data and the idealized models at the
         # spitzer wavelengths so that I can do the stacking
         # First, interpolate each model to the spitzer waves
         if spitzWaves.size and stackSave:
-            if amin1 < bos1 and \
-                sconf.find_nearest(sconf.GRAINSIZES, amin1) < \
-                sconf.find_nearest(sconf.GRAINSIZES, bos1):
-                medium_warm_flux = star2.calcFluxWarmAmin(sconf.WAVELENGTHS,
+            near_amin = conf_s.find_nearest(conf_s.GRAINSIZES, amin1)
+            near_bos  = conf_s.find_nearest(conf_s.GRAINSIZES, bos1)
+            if near_amin < near_bos:
+                medium_warm_flux = star.high_res_warm_amin(conf_s.WAVELENGTHS,
                     RW, bos1) * n1
-                small_warm_flux = star2.calcFluxWarmMinGrains(sconf.WAVELENGTHS,
+                small_warm_flux = star.high_res_warm_small(conf_s.WAVELENGTHS,
                     RW, amin1) * n1
                 medium_warm_ideal = np.exp(np.interp(
-                    np.log(spitzWaves), np.log(sconf.WAVELENGTHS),
+                    np.log(spitzWaves), np.log(conf_s.WAVELENGTHS),
                     np.log(medium_warm_flux)
                     ))
                 small_warm_ideal = np.exp(np.interp(
-                    np.log(spitzWaves), np.log(sconf.WAVELENGTHS),
+                    np.log(spitzWaves), np.log(conf_s.WAVELENGTHS),
                     np.log(small_warm_flux)
                     ))
             else:
                 medium_warm_ideal = [np.nan]*spitzWaves.size
                 small_warm_ideal = [np.nan]*spitzWaves.size
             warm_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y1)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y1)
                 ))
             cold_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y2)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y2)
                 ))
             star_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(ngModel)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(ngModel)
                 ))
             stacking_d = {'wavelength': spitzWaves, 'flux': spitzFlux,
                 'error': spitzError, 'instrument': spitzInsts,
@@ -623,25 +596,25 @@ def run_fits(starName):
                 'small_warm_ideal': small_warm_ideal}
             stacking_df = pd.DataFrame(stacking_d)
             stacking_df.to_csv(
-                sconf.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
+                conf_s.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
                 index=False
                 )
 
     elif noWander:
-        y1 = n1 * star2.calcFluxWarm(sconf.WAVELENGTHS, RW)
-        y2 = n2 * star2.calcFluxCold(sconf.WAVELENGTHS, RC)
-        ngModel = np.e**np.interp(np.log(sconf.WAVELENGTHS), np.log(ngWave),
+        y1 = n1 * star.high_res_warm(conf_s.WAVELENGTHS, RW)
+        y2 = n2 * star.high_res_cold(conf_s.WAVELENGTHS, RC)
+        ngModel = np.e**np.interp(np.log(conf_s.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
         totalFlux = y1 + y2 + ngModel
         if spitzWaves.size and stackSave:
             warm_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y1)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y1)
                 ))
             cold_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y2)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y2)
                 ))
             star_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(ngModel)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(ngModel)
                 ))
             stacking_d = {'wavelength': spitzWaves, 'flux': spitzFlux,
                 'error': spitzError, 'instrument': spitzInsts,
@@ -649,28 +622,28 @@ def run_fits(starName):
                 'star_ideal': star_ideal}
             stacking_df = pd.DataFrame(stacking_d)
             stacking_df.to_csv(
-                sconf.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
+                conf_s.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
                 index=False
                 )
     elif twoWarmBelts:
-        y1 = n1 * star2.calcFluxWarm(sconf.WAVELENGTHS, RW)
-        y2 = n2 * star2.calcFluxCold(sconf.WAVELENGTHS, RC)
-        y3 = n4 * star2.calcFluxWarmMinGrains(sconf.WAVELENGTHS, RW, amin1)
-        ngModel = np.e**np.interp(np.log(sconf.WAVELENGTHS), np.log(ngWave),
+        y1 = n1 * star.high_res_warm(conf_s.WAVELENGTHS, RW)
+        y2 = n2 * star.high_res_cold(conf_s.WAVELENGTHS, RC)
+        y3 = n4 * star.high_res_warm_small(conf_s.WAVELENGTHS, RW, amin1)
+        ngModel = np.e**np.interp(np.log(conf_s.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
         totalFlux = y1 + y2 + y3 + ngModel
         if spitzWaves.size and stackSave:
             warm_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y1)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y1)
                 ))
             small_warm_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y3)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y3)
                 ))
             cold_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y2)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y2)
                 ))
             star_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(ngModel)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(ngModel)
                 ))
             stacking_d = {'wavelength': spitzWaves, 'flux': spitzFlux,
                 'error': spitzError, 'instrument': spitzInsts,
@@ -678,12 +651,12 @@ def run_fits(starName):
                 'cold_ideal': cold_ideal, 'star_ideal': star_ideal}
             stacking_df = pd.DataFrame(stacking_d)
             stacking_df.to_csv(
-                sconf.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
+                conf_s.FARRAYS_DIR+'Both Wander/{}.csv'.format(starName),
                 index=False
                 )
     elif oneBeltWander:
-        y2 = n2 * star2.calcFluxColdAmin(sconf.WAVELENGTHS, RC, amin2)
-        ngModel = np.e**np.interp(np.log(sconf.WAVELENGTHS), np.log(ngWave),
+        y2 = n2 * star.high_res_cold_amin(conf_s.WAVELENGTHS, RC, amin2)
+        ngModel = np.e**np.interp(np.log(conf_s.WAVELENGTHS), np.log(ngWave),
             np.log(n3*ngFnu))
         totalFlux = y2 + ngModel
         # I want to save the spitzer data and the idealized models at the
@@ -691,52 +664,52 @@ def run_fits(starName):
         # First, interpolate each model to the spitzer waves
         if spitzWaves.size and stackSave:
             cold_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(y2)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(y2)
                 ))
             star_ideal = np.exp(np.interp(
-                np.log(spitzWaves), np.log(sconf.WAVELENGTHS), np.log(ngModel)
+                np.log(spitzWaves), np.log(conf_s.WAVELENGTHS), np.log(ngModel)
                 ))
             stacking_d = {'wavelength': spitzWaves, 'flux': spitzFlux,
                 'error': spitzError, 'instrument': spitzInsts,
                 'cold_ideal': cold_ideal, 'star_ideal': star_ideal}
             stacking_df = pd.DataFrame(stacking_d)
             stacking_df.to_csv(
-                sconf.FARRAYS_DIR+'One Cold Wander/{}.csv'.format(starName),
+                conf_s.FARRAYS_DIR+'One Cold Wander/{}.csv'.format(starName),
                 index=False
                 )
 
     # Calculate Lstar/Ldust
     if not oneBeltWander:
-        l_warm = sconf.lum_ratio(ngModel, y1, sconf.WAVELENGTHS)
-    l_cold = sconf.lum_ratio(ngModel, y2, sconf.WAVELENGTHS)
+        l_warm = conf_s.lum_ratio(ngModel, y1, conf_s.WAVELENGTHS)
+    l_cold = conf_s.lum_ratio(ngModel, y2, conf_s.WAVELENGTHS)
     if twoWarmBelts:
-        l_warm_small = sconf.lum_ratio(ngModel, y3, sconf.WAVELENGTHS)
+        l_warm_small = conf_s.lum_ratio(ngModel, y3, conf_s.WAVELENGTHS)
 
     # Calculate dust mass of each belt in lunar masses
     if oneWander:
-        mass_warm = star2.calcDustMass(n1, RW, amin1*1e-6, 1e-3,
+        mass_warm = star.calcDustMass(n1, RW, amin1*1e-6, 1e-3,
             densities[innerGrain])/moon_mass
-        mass_cold = star2.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
+        mass_cold = star.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
             densities[outerGrain])/moon_mass
     elif twoWander:
-        mass_warm = star2.calcDustMass(n1, RW, amin1*1e-6, 1e-3,
+        mass_warm = star.calcDustMass(n1, RW, amin1*1e-6, 1e-3,
             densities[innerGrain])/moon_mass
-        mass_cold = star2.calcDustMass(n2, RC, amin2*1e-6, 1e-3,
+        mass_cold = star.calcDustMass(n2, RC, amin2*1e-6, 1e-3,
             densities[outerGrain])/moon_mass
     elif noWander:
-        mass_warm = star2.calcDustMass(n1, RC, bos1*1e-6, 1e-3,
+        mass_warm = star.calcDustMass(n1, RC, bos1*1e-6, 1e-3,
             densities[innerGrain])/moon_mass
-        mass_cold = star2.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
+        mass_cold = star.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
             densities[outerGrain])/moon_mass
     elif twoWarmBelts:
-        mass_warm = star2.calcDustMass(n1, RW, bos1*1e-6, 1e-3,
+        mass_warm = star.calcDustMass(n1, RW, bos1*1e-6, 1e-3,
             densities[innerGrain])/moon_mass
-        mass_cold = star2.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
+        mass_cold = star.calcDustMass(n2, RC, bos2*1e-6, 1e-3,
             densities[outerGrain])/moon_mass
-        small_mass_warm = star2.calcDustMass(n1, RW, amin1*1e-6,
+        small_mass_warm = star.calcDustMass(n1, RW, amin1*1e-6,
             bos1*1e-6, densities[innerGrain])/moon_mass
     elif oneBeltWander:
-        mass_cold = star2.calcDustMass(n1, RC, amin2*1e-6, 1e-3,
+        mass_cold = star.calcDustMass(n1, RC, amin2*1e-6, 1e-3,
             densities[outerGrain])/moon_mass
     if showDustMass:
         if not oneBeltWander:
@@ -759,25 +732,25 @@ def run_fits(starName):
     if twoWarmBelts:
         (fh70warm, fh70cold, fh100warm, fh100cold, fh160warm, fh160cold,
             fh70warmsmall, fh100warmsmall, fh160warmsmall
-            ) = sconf.flux_ratios_herschel(y1=y1, y2=y2, ngModel=ngModel, y3=y3)
+            ) = conf_s.flux_ratios_herschel(y1=y1, y2=y2, ngModel=ngModel, y3=y3)
         (fm24warm, fm24cold, fm70warm, fm70cold, fm160warm, fm160cold,
             fm24warmsmall, fm70warmsmall, fm160warmsmall
-            ) = sconf.flux_ratios_mips(y1=y1, y2=y2, ngModel=ngModel, y3=y3)
+            ) = conf_s.flux_ratios_mips(y1=y1, y2=y2, ngModel=ngModel, y3=y3)
 
     elif not oneBeltWander:
         (fh70warm, fh70cold, fh100warm, fh100cold, fh160warm, fh160cold,
             fh70warmsmall, fh100warmsmall, fh160warmsmall
-            ) = sconf.flux_ratios_herschel(y1=y1, y2=y2, ngModel=ngModel)
+            ) = conf_s.flux_ratios_herschel(y1=y1, y2=y2, ngModel=ngModel)
         (fm24warm, fm24cold, fm70warm, fm70cold, fm160warm, fm160cold,
             fm24warmsmall, fm70warmsmall, fm160warmsmall
-            ) = sconf.flux_ratios_mips(y1=y1, y2=y2, ngModel=ngModel)
+            ) = conf_s.flux_ratios_mips(y1=y1, y2=y2, ngModel=ngModel)
     elif oneBeltWander:
         (fh70warm, fh70cold, fh100warm, fh100cold, fh160warm, fh160cold,
             fh70warmsmall, fh100warmsmall, fh160warmsmall
-            ) = sconf.flux_ratios_herschel(y2=y2, ngModel=ngModel)
+            ) = conf_s.flux_ratios_herschel(y2=y2, ngModel=ngModel)
         (fm24warm, fm24cold, fm70warm, fm70cold, fm160warm, fm160cold,
             fm24warmsmall, fm70warmsmall, fm160warmsmall
-            ) = sconf.flux_ratios_mips(y2=y2, ngModel=ngModel)
+            ) = conf_s.flux_ratios_mips(y2=y2, ngModel=ngModel)
 
     if showFluxRatios:
         print('--- Herschel 70 microns filter ---')
@@ -819,17 +792,17 @@ def run_fits(starName):
 
     # Plot realistic grain fluxes
     if not oneBeltWander:
-        plt.plot(sconf.WAVELENGTHS, y1, ls='--', color='blue',
+        plt.plot(conf_s.WAVELENGTHS, y1, ls='--', color='blue',
             label=r'R$_0$ Warm: {:.2f} AU'.format(RW))
-    plt.plot(sconf.WAVELENGTHS, y2, ls='--', color='r',
+    plt.plot(conf_s.WAVELENGTHS, y2, ls='--', color='r',
         label='R$_0$ Cold: {:.2f} AU'.format(RC))
     if twoWarmBelts:
-        plt.plot(sconf.WAVELENGTHS, y3, ls='-.', color='blue',
+        plt.plot(conf_s.WAVELENGTHS, y3, ls='-.', color='blue',
             label=r'R$_0$ SmallGrains: {:.2f} AU'.format(RW))
     # Plot stellar model, total flux, and IRS data
     plt.plot(ngWave, n3*ngFnu, color = 'gray',
         label='Next Gen T: {} K'.format(int(starLabel)))
-    plt.plot(sconf.WAVELENGTHS, totalFlux, color='lime', label='Total Flux')
+    plt.plot(conf_s.WAVELENGTHS, totalFlux, color='lime', label='Total Flux')
     if spitzInsts.size:
         plt.plot(spitzWaves, spitzFlux, color='black', label='Spitzer IRS')
 
@@ -866,8 +839,8 @@ def run_fits(starName):
 
     # Plot formatting
     plt.title(starName, fontsize=22)
-    plt.xlabel(r'$\lambda$ ($\mu m$)')
-    plt.ylabel(r'$F_{\nu}$ ($Jy$)')
+    plt.xlabel(r'$\lambda$ ($\mu m$)', fontsize=18)
+    plt.ylabel(r'$F_{\nu}$ ($Jy$)', fontsize=18)
     plt.semilogx()
     plt.semilogy()
 
@@ -974,8 +947,6 @@ def run_fits(starName):
             }
         df = pd.DataFrame(fitResults)
         df.to_csv(PARAMS_DIR+'{}.csv'.format(starName), index=False)
-        # df = pd.DataFrame(fluxRatioResults)
-        # df.to_csv(FRATIOS_DIR+'{}.csv'.format(starName), index=False)
 
     if saveFigure:
         plt.savefig(IMG_DIR+starName+'.png', bbox_inches='tight')
@@ -988,17 +959,21 @@ def run_fits(starName):
 ################################################################################
 
 if __name__ == '__main__':
+    SMALL_SIZE = 8
+    MEDIUM_SIZE = 12
+    BIGGER_SIZE = 18
+    plt.rc('font', size=MEDIUM_SIZE)          # controls default text sizes
+    plt.rc('axes', titlesize=MEDIUM_SIZE)     # fontsize of the axes title
+    plt.rc('axes', labelsize=BIGGER_SIZE)     # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+    plt.rc('ytick', labelsize=MEDIUM_SIZE)    # fontsize of the tick labels
+    plt.rc('legend', fontsize=MEDIUM_SIZE)    # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)   # fontsize of the figure title
 
-    # starNames = starNames[7:]
     for stn, starName in enumerate(starNames):
         # Choose the bounds on the blowout sizes given the conditional
-        # statements in the bound_options.py file.
-        amin1_Low, amin1_High, amin2_Low, amin2_High = (
-            bound_options.boundify(starName)
-            )
-
-        # See if the bounds of the cold grains should be the bounds of the warm
-        # amin1_Low, amin1_High = amin2_Low, amin2_High
+        # statements in the options_bounds.py file.
+        amin1_Low, amin1_High, amin2_Low, amin2_High = boundify(starName)
 
         # Let's the user know which star is running and how many are being
         # processed at a time.
