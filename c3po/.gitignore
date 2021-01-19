@@ -1,0 +1,2 @@
+# Ignore models that are still in development
+!.gitignore

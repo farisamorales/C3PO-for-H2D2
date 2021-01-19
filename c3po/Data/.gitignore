@@ -1,0 +1,7 @@
+# Ignore everything in this directory
+spatialRadii.csv
+starNames.txt
+totalStarNames.txt
+stars unstitched
+# Except this file
+!.gitignore
